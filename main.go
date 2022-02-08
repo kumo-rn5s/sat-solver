@@ -46,6 +46,13 @@ func (f *CNF) Push(v []int) *CNF {
 }
 
 func (f *CNF) Delete(clause *Clause) bool {
+	if clause == f.Head {
+		newHead := clause.next
+		clause.next = nil
+		f.Head = newHead
+		return true
+	}
+
 	if clause != nil {
 		prev_node := clause.prev
 		next_node := clause.next

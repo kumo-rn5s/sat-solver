@@ -41,6 +41,24 @@ func TestDelete(t *testing.T) {
 	}
 }
 
+func TestDeleteHead(t *testing.T) {
+	f := &CNF{}
+	testa := []int{1, 2, 3, 0}
+	testb := []int{2, 3, 4, 0}
+	testc := []int{3, 4, 5, 0}
+
+	f.Push(testa)
+	f.Push(testb)
+	f.Push(testc)
+
+	f.Delete(f.Head)
+
+	if !reflect.DeepEqual(f.Head.Literals, testb) ||
+		!reflect.DeepEqual(f.Head.next.Literals, testc) {
+		t.Error("Delete Failure")
+	}
+}
+
 func TestFindClause(t *testing.T) {
 	f := &CNF{}
 	testa := []int{1, 2, 3, 0}
