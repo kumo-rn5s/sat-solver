@@ -152,18 +152,14 @@ func Parse(filename string) (*CNF, error) {
 	return formulas, nil
 }
 
-func contains(clause []int, target int) (int, int) {
+func contains(clause []int, target int) int {
 	l := -1
-	lNot := -1
 	for index, literal := range clause {
 		if literal == target {
 			l = index
 		}
-		if literal == target*(-1) {
-			lNot = index
-		}
 	}
-	return l, lNot
+	return l
 }
 
 /*
@@ -172,28 +168,36 @@ func contains(clause []int, target int) (int, int) {
 */
 func unitElimination(formula *CNF) {
 
+	operationMap := map[*Clause][]int{}
+
+	targetLiteral := 0
 	for n := formula.First(); n != nil; n = n.Next() {
-		targetLiteral := 0
 		if len(n.Literals) == 1 {
 			targetLiteral = n.Literals[0]
+			break
 		}
+	}
 
-		for n := formula.First(); n != nil && targetLiteral != 0; n = n.Next() {
-			//Lを含む節と¬Lを含む節に、Lと¬LのIndexを出力
-			literalIndex, literalNotIndex := contains(n.Literals, targetLiteral)
-			if literalNotIndex != -1 {
-				n.Remove(literalNotIndex)
+	for n := formula.First(); n != nil && targetLiteral != 0; n = n.Next() {
+		//Lを含む節と¬Lを含む節に、Lと¬LのIndexを出力
+		literalIndex := contains(n.Literals, targetLiteral)
+		literalNotIndex := contains(n.Literals, targetLiteral*(-1))
+		if literalIndex*literalNotIndex != 1 {
+			operationMap[n] = []int{literalIndex, literalNotIndex}
+		}
+	}
+
+	for clause, value := range operationMap {
+		log.Println(value)
+		if clause != nil {
+			if value[1] != -1 {
+				clause.Remove(value[1])
 			}
-			if literalIndex*literalNotIndex != 1 {
-				formula.Delete(n)
+			if value[0] != -1 {
+				formula.Delete(clause)
 			}
 		}
 	}
-}
-
-type TwoSidedness struct {
-	Affirmative bool
-	Negative    bool
 }
 
 /*
@@ -202,29 +206,39 @@ type TwoSidedness struct {
 */
 func pureElimination(formula *CNF) {
 
-	//literalMap := make(map[int]TwoSidedness)
-	for n := formula.First(); n != nil; n = n.Next() {
-
+	literalMap := make(map[int]bool)
+	for l := 1; l <= formula.Preamble.VariablesNum; l++ {
+		for n := formula.First(); n != nil; n = n.Next() {
+			literalIndex := contains(n.Literals, l)
+			literalNotIndex := contains(n.Literals, l*(-1))
+			if literalIndex*literalNotIndex > 0 {
+				literalMap[l] = false
+				literalMap[l*(-1)] = false
+			}
+			if _, ok := literalMap[l]; !ok && literalIndex != -1 && literalNotIndex == -1 {
+				literalMap[l] = true
+			}
+			if _, ok := literalMap[l*(-1)]; !ok && literalIndex == -1 && literalNotIndex != -1 {
+				literalMap[l*(-1)] = true
+			}
+		}
 	}
 
-	// for index, clause := range formula.Clause {
-	// 	if target == 0 && len(clause.Literal) == 1 {
-	// 		target = clause.Literal[0]
-	// 		targetIndex = append(targetIndex, index)
-	// 	}
-
-	// 	if target != 0 {
-	// 		if !contains(clause.Literal, -1*target) {
-	// 			targetIndex = append(targetIndex, index)
-	// 		}
-	// 	}
-	// }
-	// formula.Clause = remove(formula.Clause, targetIndex)
+	for key, value := range literalMap {
+		if !value {
+			for n := formula.First(); n != nil; n = n.Next() {
+				literalIndex := contains(n.Literals, key)
+				if literalIndex != -1 {
+					formula.Delete(n)
+				}
+			}
+		}
+	}
 }
 
 func DPLL(formula *CNF) bool {
 	unitElimination(formula)
-	//pureElimination(formula)
+	pureElimination(formula)
 	//splitting(&formula)
 
 	// if len(formula.Clause) == 0 {
