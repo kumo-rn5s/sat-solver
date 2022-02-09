@@ -294,5 +294,15 @@ func DPLL(formula *CNF) bool {
 }
 
 func main() {
-
+	filename := "./test-unsat-1.cnf"
+	formula, err := Parse(filename)
+	if err != nil {
+		log.Println("UNSATISFIABLE")
+		os.Exit(1)
+	}
+	if DPLL(formula) {
+		log.Println("SATISFIABLE")
+	} else {
+		log.Println("UNSATISFIABLE")
+	}
 }
