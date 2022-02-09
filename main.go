@@ -33,7 +33,7 @@ func (f *CNF) First() *Clause {
 	return f.Head
 }
 
-func (f *CNF) Push(v []int) *CNF {
+func (f *CNF) Push(v []int) {
 	n := &Clause{Literals: v}
 	if f.Head == nil {
 		f.Head = n
@@ -42,33 +42,24 @@ func (f *CNF) Push(v []int) *CNF {
 		n.prev = f.Tail
 	}
 	f.Tail = n
-	return f
 }
 
-func (f *CNF) Delete(clause *Clause) bool {
+func (f *CNF) Delete(clause *Clause) {
 	if clause == f.Head {
 		newHead := clause.next
 		clause.next = nil
 		f.Head = newHead
-		return true
-	}
-
-	if clause == f.Tail {
+	} else if clause == f.Tail {
 		newTail := clause.prev
 		newTail.next = nil
 		f.Tail = newTail
-		return true
-	}
-
-	if clause != nil {
+	} else if clause != nil {
 		prev_node := clause.prev
 		next_node := clause.next
 
 		prev_node.next = clause.next
 		next_node.prev = clause.prev
-		return true
 	}
-	return false
 }
 
 // Clause Node Methods
@@ -80,13 +71,14 @@ func (c *Clause) Prev() *Clause {
 	return c.prev
 }
 
-func (c *Clause) Find(literal int) bool {
-	for _, l := range c.Literals {
+func (c *Clause) Find(literal int) int {
+	res := -1
+	for index, l := range c.Literals {
 		if l == literal {
-			return true
+			res = index
 		}
 	}
-	return false
+	return res
 }
 
 func (c *Clause) Remove(index int) {
@@ -159,16 +151,6 @@ func Parse(filename string) (*CNF, error) {
 	return formulas, nil
 }
 
-func contains(clause []int, target int) int {
-	l := -1
-	for index, literal := range clause {
-		if literal == target {
-			l = index
-		}
-	}
-	return l
-}
-
 /*
 1リテラル規則（one literal rule, unit rule）
 リテラル L 1つだけの節があれば、L を含む節を除去し、他の節の否定リテラル ¬L を消去する。
@@ -187,8 +169,8 @@ func unitElimination(formula *CNF) {
 
 	for n := formula.First(); n != nil && targetLiteral != 0; n = n.Next() {
 		//Lを含む節と¬Lを含む節に、Lと¬LのIndexを出力
-		literalIndex := contains(n.Literals, targetLiteral)
-		literalNotIndex := contains(n.Literals, targetLiteral*(-1))
+		literalIndex := n.Find(targetLiteral)
+		literalNotIndex := n.Find(targetLiteral * (-1))
 		if literalIndex*literalNotIndex != 1 {
 			operation[n] = []int{literalIndex, literalNotIndex}
 		}
@@ -230,7 +212,7 @@ func pureElimination(formula *CNF) {
 	for key, value := range literalMap {
 		if value {
 			for n := formula.First(); n != nil; n = n.Next() {
-				literalIndex := contains(n.Literals, key)
+				literalIndex := n.Find(key)
 				if literalIndex != -1 {
 					operation = append(operation, n)
 				}

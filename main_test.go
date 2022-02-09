@@ -77,17 +77,6 @@ func TestDeleteTail(t *testing.T) {
 	}
 }
 
-func TestFindClause(t *testing.T) {
-	f := &CNF{}
-	testa := []int{1, 2, 3, 0}
-
-	f.Push(testa)
-
-	if !f.Head.Find(1) || f.Head.Find(4) {
-		t.Error("Clause Find Failure")
-	}
-}
-
 func TestParse(t *testing.T) {
 	filename := "./aim-100-1_6-no-1.cnf"
 	formula, err := Parse(filename)
