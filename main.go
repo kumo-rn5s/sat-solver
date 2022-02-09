@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -200,6 +201,7 @@ func pureElimination(formula *CNF) {
 	literalMap := make(map[int]bool)
 	// literal: true -> Pure
 	// literal: false -> Not pure
+
 	for n := formula.First(); n != nil; n = n.Next() {
 		for _, l := range n.Literals {
 			if _, ok := literalMap[l*(-1)]; !ok {
@@ -232,7 +234,7 @@ func getAtomicFormula(f *CNF) int {
 	variables := map[int]int{}
 	for n := f.First(); n != nil; n = n.Next() {
 		for _, literal := range n.Literals {
-			if value, ok := variables[literal]; !ok {
+			if value, ok := variables[int(math.Abs(float64(literal)))]; !ok {
 				variables[literal] = 1
 			} else {
 				variables[literal] = value + 1
@@ -250,35 +252,44 @@ func getAtomicFormula(f *CNF) int {
 	return maxInt
 }
 
-var EmptyClause []int
+func (f *CNF) DeepCopy() *CNF {
+	newFormula := &CNF{}
+	for n := f.First(); n != nil; n = n.Next() {
+		newFormula.Push(n.Literals)
+	}
+	return newFormula
+}
 
 func DPLL(formula *CNF) bool {
 	unitElimination(formula)
-	pureElimination(formula)
+	//pureElimination(formula)
 	//splitting(&formula)
 
-	if len(formula.Head.Literals) == 0 {
+	if formula.Head == nil {
 		return true
 	}
 
 	for n := formula.First(); n != nil; n = n.Next() {
-		if reflect.DeepEqual(formula.Head.Literals, EmptyClause) {
+		if reflect.DeepEqual(n.Literals, []int{}) {
 			return false
 		}
 	}
 
 	variable := getAtomicFormula(formula)
 
-	// for literal := range nowVariables {
-	// 	formula.ValueSet[literal] = true
-	// 	if DPLL(formula) {
-	// 		return true
-	// 	}
-	// 	formula.ValueSet[literal] = false
-	// 	if DPLL(formula) {
-	// 		return true
-	// 	}
-	// }
+	formulaBranch1 := formula.DeepCopy()
+	formulaBranch2 := formula.DeepCopy()
+
+	formulaBranch1.Push([]int{variable})
+	if DPLL(formulaBranch1) {
+		return true
+	}
+
+	formulaBranch2.Push([]int{variable * (-1)})
+	if DPLL(formulaBranch2) {
+		return true
+	}
+
 	return false
 }
 

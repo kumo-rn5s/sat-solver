@@ -128,7 +128,7 @@ func TestUnitElimination(t *testing.T) {
 		t.Error("Second Unit Elimination Failure")
 	}
 	unitElimination(formula)
-	if !reflect.DeepEqual(formula.Head.Literals, EmptyClause) ||
+	if !reflect.DeepEqual(formula.Head.Literals, []int{}) ||
 		!reflect.ValueOf(formula.Head.next).IsNil() {
 		t.Error("Third Unit Elimination Failure")
 	}
@@ -154,5 +154,44 @@ func TestPureElimination(t *testing.T) {
 		!reflect.DeepEqual(formula.Head.next.Literals, []int{-3, -4}) ||
 		!reflect.ValueOf(formula.Head.next.next).IsNil() {
 		t.Error("First Pure Elimination Failure")
+	}
+}
+
+func TestGetAtomicFormula(t *testing.T) {
+	formula := &CNF{
+		Preamble: Preamble{
+			Format:       "cnf",
+			VariablesNum: 6,
+			ClausesNum:   4,
+		},
+	}
+
+	formula.Push([]int{1, 2})
+	formula.Push([]int{5, 4})
+	formula.Push([]int{3, -5})
+	formula.Push([]int{5, -6})
+
+	result := getAtomicFormula(formula)
+
+	if result != 5 {
+		t.Error("Get Atomic Formula Error")
+	}
+}
+
+func TestDPLL(t *testing.T) {
+	formula := &CNF{
+		Preamble: Preamble{
+			Format:       "cnf",
+			VariablesNum: 3,
+			ClausesNum:   4,
+		},
+	}
+
+	formula.Push([]int{1, 2, -3})
+	formula.Push([]int{1, -2})
+	formula.Push([]int{-1})
+	formula.Push([]int{2, 3})
+	if DPLL(formula) {
+		t.Error("DPLL Error")
 	}
 }
