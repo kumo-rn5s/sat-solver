@@ -144,3 +144,26 @@ func TestUnitElimination(t *testing.T) {
 		t.Error("Third Unit Elimination Failure")
 	}
 }
+
+func TestPureElimination(t *testing.T) {
+	formula := &CNF{
+		Preamble: Preamble{
+			Format:       "cnf",
+			VariablesNum: 4,
+			ClausesNum:   4,
+		},
+	}
+
+	formula.Push([]int{1, 2})
+	formula.Push([]int{-1, 2})
+	formula.Push([]int{3, 4})
+	formula.Push([]int{-3, -4})
+
+	pureElimination(formula)
+
+	if !reflect.DeepEqual(formula.Head.Literals, []int{3, 4}) ||
+		!reflect.DeepEqual(formula.Head.next.Literals, []int{-3, -4}) ||
+		!reflect.ValueOf(formula.Head.next.next).IsNil() {
+		t.Error("First Pure Elimination Failure")
+	}
+}

@@ -175,7 +175,7 @@ func contains(clause []int, target int) int {
 */
 func unitElimination(formula *CNF) {
 
-	operationMap := map[*Clause][]int{}
+	operation := map[*Clause][]int{}
 
 	targetLiteral := 0
 	for n := formula.First(); n != nil; n = n.Next() {
@@ -190,12 +190,12 @@ func unitElimination(formula *CNF) {
 		literalIndex := contains(n.Literals, targetLiteral)
 		literalNotIndex := contains(n.Literals, targetLiteral*(-1))
 		if literalIndex*literalNotIndex != 1 {
-			operationMap[n] = []int{literalIndex, literalNotIndex}
+			operation[n] = []int{literalIndex, literalNotIndex}
 		}
 	}
 
-	for clause, value := range operationMap {
-		log.Println(value)
+	// 統一して削除
+	for clause, value := range operation {
 		if clause != nil {
 			if value[1] != -1 {
 				clause.Remove(value[1])
@@ -213,33 +213,33 @@ func unitElimination(formula *CNF) {
 */
 func pureElimination(formula *CNF) {
 
+	operation := []*Clause{}
 	literalMap := make(map[int]bool)
-	for l := 1; l <= formula.Preamble.VariablesNum; l++ {
-		for n := formula.First(); n != nil; n = n.Next() {
-			literalIndex := contains(n.Literals, l)
-			literalNotIndex := contains(n.Literals, l*(-1))
-			if literalIndex*literalNotIndex > 0 {
-				literalMap[l] = false
-				literalMap[l*(-1)] = false
-			}
-			if _, ok := literalMap[l]; !ok && literalIndex != -1 && literalNotIndex == -1 {
+	// literal: true -> Pure
+	// literal: false -> Not pure
+	for n := formula.First(); n != nil; n = n.Next() {
+		for _, l := range n.Literals {
+			if _, ok := literalMap[l*(-1)]; !ok {
 				literalMap[l] = true
-			}
-			if _, ok := literalMap[l*(-1)]; !ok && literalIndex == -1 && literalNotIndex != -1 {
-				literalMap[l*(-1)] = true
+			} else {
+				literalMap[l*(-1)] = false
 			}
 		}
 	}
 
 	for key, value := range literalMap {
-		if !value {
+		if value {
 			for n := formula.First(); n != nil; n = n.Next() {
 				literalIndex := contains(n.Literals, key)
 				if literalIndex != -1 {
-					formula.Delete(n)
+					operation = append(operation, n)
 				}
 			}
 		}
+	}
+	// 統一して削除
+	for _, clause := range operation {
+		formula.Delete(clause)
 	}
 }
 
