@@ -226,6 +226,30 @@ func pureElimination(formula *CNF) {
 	}
 }
 
+// moms heuristicへの準備
+func getAtomicFormula(f *CNF) int {
+	//出現回数記録
+	variables := map[int]int{}
+	for n := f.First(); n != nil; n = n.Next() {
+		for _, literal := range n.Literals {
+			if value, ok := variables[literal]; !ok {
+				variables[literal] = 1
+			} else {
+				variables[literal] = value + 1
+			}
+		}
+	}
+	maxNumber := 0
+	maxInt := -1
+	for i, v := range variables {
+		if v > maxNumber {
+			maxNumber = v
+			maxInt = i
+		}
+	}
+	return maxInt
+}
+
 var EmptyClause []int
 
 func DPLL(formula *CNF) bool {
@@ -242,7 +266,8 @@ func DPLL(formula *CNF) bool {
 			return false
 		}
 	}
-	// nowVariables := getNowLiteral(formula)
+
+	variable := getAtomicFormula(formula)
 
 	// for literal := range nowVariables {
 	// 	formula.ValueSet[literal] = true
