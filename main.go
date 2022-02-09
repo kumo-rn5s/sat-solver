@@ -53,6 +53,13 @@ func (f *CNF) Delete(clause *Clause) bool {
 		return true
 	}
 
+	if clause == f.Tail {
+		newTail := clause.prev
+		newTail.next = nil
+		f.Tail = newTail
+		return true
+	}
+
 	if clause != nil {
 		prev_node := clause.prev
 		next_node := clause.next

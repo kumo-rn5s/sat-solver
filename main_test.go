@@ -32,7 +32,7 @@ func TestDelete(t *testing.T) {
 	f.Push(testb)
 	f.Push(testc)
 
-	f.Delete(f.Head)
+	f.Delete(f.Head.next)
 
 	if !reflect.DeepEqual(f.Head.Literals, testa) ||
 		!reflect.DeepEqual(f.Head.next.Literals, testc) ||
@@ -55,7 +55,25 @@ func TestDeleteHead(t *testing.T) {
 
 	if !reflect.DeepEqual(f.Head.Literals, testb) ||
 		!reflect.DeepEqual(f.Head.next.Literals, testc) {
-		t.Error("Delete Failure")
+		t.Error("Delete Head Failure")
+	}
+}
+
+func TestDeleteTail(t *testing.T) {
+	f := &CNF{}
+	testa := []int{1, 2, 3, 0}
+	testb := []int{2, 3, 4, 0}
+	testc := []int{3, 4, 5, 0}
+
+	f.Push(testa)
+	f.Push(testb)
+	f.Push(testc)
+
+	f.Delete(f.Tail)
+
+	if !reflect.DeepEqual(f.Head.Literals, testa) ||
+		!reflect.DeepEqual(f.Head.next.Literals, testb) {
+		t.Error("Delete Tail Failure")
 	}
 }
 
