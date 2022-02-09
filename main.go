@@ -255,15 +255,26 @@ func getAtomicFormula(f *CNF) int {
 func (f *CNF) DeepCopy() *CNF {
 	newFormula := &CNF{}
 	for n := f.First(); n != nil; n = n.Next() {
-		newFormula.Push(n.Literals)
+		newInt := []int{}
+		newInt = append(newInt, n.Literals...)
+
+		newFormula.Push(newInt)
 	}
 	return newFormula
 }
 
 func DPLL(formula *CNF) bool {
+	for n := formula.First(); n != nil; n = n.Next() {
+		log.Println("Start: ", n.Literals)
+	}
+
 	unitElimination(formula)
 	//pureElimination(formula)
 	//splitting(&formula)
+
+	for n := formula.First(); n != nil; n = n.Next() {
+		log.Println("After: ", n.Literals)
+	}
 
 	if formula.Head == nil {
 		return true
@@ -276,16 +287,19 @@ func DPLL(formula *CNF) bool {
 	}
 
 	variable := getAtomicFormula(formula)
+	log.Println("var: ", variable)
 
 	formulaBranch1 := formula.DeepCopy()
 	formulaBranch2 := formula.DeepCopy()
 
 	formulaBranch1.Push([]int{variable})
+	log.Println("Branch1 Start: ")
 	if DPLL(formulaBranch1) {
 		return true
 	}
 
 	formulaBranch2.Push([]int{variable * (-1)})
+	log.Println("Branch2 Start: ")
 	if DPLL(formulaBranch2) {
 		return true
 	}
@@ -294,7 +308,11 @@ func DPLL(formula *CNF) bool {
 }
 
 func main() {
+	// filename := "./test/uuf150/uuf150-06.cnf"
+	//filename := "./test/sat/easy-sat-001.cnf"
+	//filename := "./test/uf50-218/uf50-01.cnf"
 	filename := "./test-unsat-1.cnf"
+	//filename := "./test/uf20-91/uf20-01.cnf"
 	formula, err := Parse(filename)
 	if err != nil {
 		log.Println("UNSATISFIABLE")

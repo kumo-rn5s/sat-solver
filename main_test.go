@@ -22,6 +22,28 @@ func TestAdd(t *testing.T) {
 	}
 }
 
+func TestDeepCopy(t *testing.T) {
+	f := &CNF{}
+	testa := []int{1, 2, 3, 0}
+	testb := []int{2, -3, 4, 0}
+	testc := []int{-3, 4, 5, 0}
+
+	f.Push(testa)
+	f.Push(testb)
+	f.Push(testc)
+
+	newF := f.DeepCopy()
+	if !(f.Head != newF.Head && reflect.DeepEqual(f.Head, newF.Head)) {
+		t.Error("DeepCopy1 Failure")
+	}
+	if !(f.Head.next != newF.Head.next && reflect.DeepEqual(f.Head.next, newF.Head.next)) {
+		t.Error("DeepCopy2 Failure")
+	}
+	if !(f.Head.next.next != newF.Head.next.next && reflect.DeepEqual(f.Head.next.next, newF.Head.next.next)) {
+		t.Error("DeepCopy3 Failure")
+	}
+}
+
 func TestDelete(t *testing.T) {
 	f := &CNF{}
 	testa := []int{1, 2, 3, 0}
