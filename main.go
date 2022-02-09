@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 )
@@ -54,11 +55,11 @@ func (f *CNF) Delete(clause *Clause) {
 		newTail.next = nil
 		f.Tail = newTail
 	} else if clause != nil {
-		prev_node := clause.prev
-		next_node := clause.next
+		prev := clause.prev
+		next := clause.next
 
-		prev_node.next = clause.next
-		next_node.prev = clause.prev
+		prev.next = clause.next
+		next.prev = clause.prev
 	}
 }
 
@@ -225,15 +226,22 @@ func pureElimination(formula *CNF) {
 	}
 }
 
+var EmptyClause []int
+
 func DPLL(formula *CNF) bool {
 	unitElimination(formula)
 	pureElimination(formula)
 	//splitting(&formula)
 
-	// if len(formula.Clause) == 0 {
-	// 	return true
-	// }
+	if len(formula.Head.Literals) == 0 {
+		return true
+	}
 
+	for n := formula.First(); n != nil; n = n.Next() {
+		if reflect.DeepEqual(formula.Head.Literals, EmptyClause) {
+			return false
+		}
+	}
 	// nowVariables := getNowLiteral(formula)
 
 	// for literal := range nowVariables {

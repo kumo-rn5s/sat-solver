@@ -128,7 +128,7 @@ func TestUnitElimination(t *testing.T) {
 		t.Error("Second Unit Elimination Failure")
 	}
 	unitElimination(formula)
-	if !reflect.DeepEqual(formula.Head.Literals, []int{}) ||
+	if !reflect.DeepEqual(formula.Head.Literals, EmptyClause) ||
 		!reflect.ValueOf(formula.Head.next).IsNil() {
 		t.Error("Third Unit Elimination Failure")
 	}
