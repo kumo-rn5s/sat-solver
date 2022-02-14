@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"reflect"
 	"testing"
 )
@@ -24,22 +25,25 @@ func TestAdd(t *testing.T) {
 
 func TestDeepCopy(t *testing.T) {
 	f := &CNF{}
-	testa := []int{1, 2, 3, 0}
-	testb := []int{2, -3, 4, 0}
-	testc := []int{-3, 4, 5, 0}
+	testa := []int{2, -3, 0}
+	testb := []int{-2, 0}
+	testc := []int{3, 2, 0}
 
 	f.Push(testa)
 	f.Push(testb)
 	f.Push(testc)
 
 	newF := f.DeepCopy()
-	if !(f.Head != newF.Head && reflect.DeepEqual(f.Head, newF.Head)) {
+	log.Println(newF.Head.Literals)
+	log.Println(newF.Head.next.Literals)
+	log.Println(newF.Head.next.next.Literals)
+	if !(f.Head != newF.Head && reflect.DeepEqual(f.Head.Literals, newF.Head.Literals)) {
 		t.Error("DeepCopy1 Failure")
 	}
-	if !(f.Head.next != newF.Head.next && reflect.DeepEqual(f.Head.next, newF.Head.next)) {
+	if !(f.Head.next != newF.Head.next && reflect.DeepEqual(f.Head.next.Literals, newF.Head.next.Literals)) {
 		t.Error("DeepCopy2 Failure")
 	}
-	if !(f.Head.next.next != newF.Head.next.next && reflect.DeepEqual(f.Head.next.next, newF.Head.next.next)) {
+	if !(f.Head.next.next != newF.Head.next.next && reflect.DeepEqual(f.Head.next.next.Literals, newF.Head.next.next.Literals)) {
 		t.Error("DeepCopy3 Failure")
 	}
 }
@@ -101,8 +105,8 @@ func TestDeleteTail(t *testing.T) {
 
 func TestParse(t *testing.T) {
 	filename := "./aim-100-1_6-no-1.cnf"
-	formula, err := Parse(filename)
-	if err != nil {
+	formula := &CNF{}
+	if err := formula.Parse(filename); err != nil {
 		t.Error("CNF Parse Failure")
 	}
 	if !(formula.Preamble.Format == "cnf") ||

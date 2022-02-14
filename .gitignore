@@ -16,3 +16,6 @@
 
 # Macbook
 .DS_Store
+
+# CNF
+*.cnf
