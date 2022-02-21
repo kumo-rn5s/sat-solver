@@ -43,13 +43,15 @@ func (f *CNF) Push(v []int) {
 		f.Tail.next = n
 		n.prev = f.Tail
 		f.Tail = n
-		f.Tail.next = nil
 	}
 
 }
 
 func (f *CNF) Delete(clause *Clause) {
-	if clause == f.Head {
+	if clause == f.Head && clause == f.Tail {
+		f.Head = nil
+		f.Tail = nil
+	} else if clause == f.Head {
 		newHead := clause.next
 		clause.next = nil
 		f.Head = newHead
@@ -106,6 +108,10 @@ func isPreamble(s string) bool {
 	return s[0:1] == "p"
 }
 
+func isStopChar(s string) bool {
+	return s[0:1] == "%"
+}
+
 func (f *CNF) parseClause(s string) bool {
 	clauseRaw := strings.Fields(s)
 	var newClauseRaw = []int{}
@@ -153,6 +159,8 @@ func (f *CNF) Parse(filename string) error {
 			f.Preamble.Format = preambles[1]
 			f.Preamble.VariablesNum, _ = strconv.Atoi(preambles[2])
 			f.Preamble.ClausesNum, _ = strconv.Atoi(preambles[3])
+		} else if isStopChar(raw) {
+			break
 		} else {
 			if res := f.parseClause(raw); !res {
 				return errors.New("wrong dimacs formats")
