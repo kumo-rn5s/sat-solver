@@ -22,12 +22,7 @@ type Clause struct {
 	prev     *Clause
 }
 
-// Formula List Methods
-func (f *CNF) First() *Clause {
-	return f.Head
-}
-
-func (f *CNF) Push(v []int) {
+func (f *CNF) push(v []int) {
 	n := &Clause{Literals: v}
 	if f.Head == nil {
 		f.Head = n
@@ -40,7 +35,7 @@ func (f *CNF) Push(v []int) {
 
 }
 
-func (f *CNF) Delete(clause *Clause) {
+func (f *CNF) delete(clause *Clause) {
 	if clause == f.Head && clause == f.Tail {
 		f.Head = nil
 		f.Tail = nil
@@ -61,7 +56,7 @@ func (f *CNF) Delete(clause *Clause) {
 	}
 }
 
-func (c *Clause) Find(literal int) int {
+func (c *Clause) find(literal int) int {
 	res := -1
 	for index, l := range c.Literals {
 		if l == literal {
@@ -71,7 +66,7 @@ func (c *Clause) Find(literal int) int {
 	return res
 }
 
-func (c *Clause) Remove(index int) {
+func (c *Clause) remove(index int) {
 	var literal []int
 	if index == 0 {
 		literal = c.Literals[1:]
@@ -115,7 +110,7 @@ func (cnf *CNF) Parse(f *os.File) error {
 		if clause == nil {
 			return errors.New("wrong dimacs formats")
 		}
-		cnf.Push(clause)
+		cnf.push(clause)
 	}
 	cnf.showCNF()
 	return nil
@@ -131,22 +126,22 @@ func (cnf *CNF) showCNF() {
 1リテラル規則（one literal rule, unit rule）
 リテラル L 1つだけの節があれば、L を含む節を除去し、他の節の否定リテラル ¬L を消去する。
 */
-func unitElimination(formula *CNF) {
+func eliminateByUnitRule(formula *CNF) {
 
 	operation := map[*Clause][]int{}
 
 	targetLiteral := 0
-	for n := formula.First(); n != nil; n = n.next {
+	for n := formula.Head; n != nil; n = n.next {
 		if len(n.Literals) == 1 {
 			targetLiteral = n.Literals[0]
 			break
 		}
 	}
 
-	for n := formula.First(); n != nil && targetLiteral != 0; n = n.next {
+	for n := formula.Head; n != nil && targetLiteral != 0; n = n.next {
 		//Lを含む節と¬Lを含む節に、Lと¬LのIndexを出力
-		literalIndex := n.Find(targetLiteral)
-		literalNotIndex := n.Find(targetLiteral * (-1))
+		literalIndex := n.find(targetLiteral)
+		literalNotIndex := n.find(targetLiteral * (-1))
 		if literalIndex*literalNotIndex != 1 {
 			operation[n] = []int{literalIndex, literalNotIndex}
 		}
@@ -156,17 +151,17 @@ func unitElimination(formula *CNF) {
 	for clause, value := range operation {
 		if clause != nil {
 			if value[1] != -1 {
-				clause.Remove(value[1])
+				clause.remove(value[1])
 			}
 			if value[0] != -1 {
-				formula.Delete(clause)
+				formula.delete(clause)
 			}
 		}
 	}
 
 	// temporary
 	if len(operation) > 0 {
-		unitElimination(formula)
+		eliminateByUnitRule(formula)
 	}
 }
 
@@ -174,14 +169,14 @@ func unitElimination(formula *CNF) {
 純リテラル規則（pure literal rule, affirmative-nagative rule）
 節集合の中に否定と肯定の両方が現れないリテラル（純リテラル） L があれば、L を含む節を除去する。
 */
-func pureElimination(formula *CNF) {
+func eliminateByPureRule(formula *CNF) {
 
 	operation := []*Clause{}
 	literalMap := make(map[int]bool)
 	// literal: true -> Pure
 	// literal: false -> Not pure
 
-	for n := formula.First(); n != nil; n = n.next {
+	for n := formula.Head; n != nil; n = n.next {
 		for _, l := range n.Literals {
 			if _, ok := literalMap[l*(-1)]; !ok {
 				literalMap[l] = true
@@ -193,8 +188,8 @@ func pureElimination(formula *CNF) {
 
 	for key, value := range literalMap {
 		if value {
-			for n := formula.First(); n != nil; n = n.next {
-				literalIndex := n.Find(key)
+			for n := formula.Head; n != nil; n = n.next {
+				literalIndex := n.find(key)
 				if literalIndex != -1 {
 					operation = append(operation, n)
 				}
@@ -203,7 +198,7 @@ func pureElimination(formula *CNF) {
 	}
 	// 統一して削除
 	for _, clause := range operation {
-		formula.Delete(clause)
+		formula.delete(clause)
 	}
 }
 
@@ -215,7 +210,7 @@ func absInt(value int) int {
 func getAtomicFormula(f *CNF) int {
 	//出現回数記録
 	variables := map[int]int{}
-	for n := f.First(); n != nil; n = n.next {
+	for n := f.Head; n != nil; n = n.next {
 		for _, literal := range n.Literals {
 			// intを処理するabs()を実装する
 			if value, ok := variables[absInt(literal)]; !ok {
@@ -237,17 +232,17 @@ func getAtomicFormula(f *CNF) int {
 
 func (f *CNF) DeepCopy() *CNF {
 	newFormula := &CNF{}
-	for n := f.First(); n != nil; n = n.next {
+	for n := f.Head; n != nil; n = n.next {
 		newInt := []int{}
 		newInt = append(newInt, n.Literals...)
 
-		newFormula.Push(newInt)
+		newFormula.push(newInt)
 	}
 	return newFormula
 }
 
 func (f *CNF) hasEmptyclause() bool {
-	for n := f.First(); n != nil; n = n.next {
+	for n := f.Head; n != nil; n = n.next {
 		if len(n.Literals) == 0 {
 			return true
 		}
@@ -256,7 +251,7 @@ func (f *CNF) hasEmptyclause() bool {
 }
 
 func DPLL(formula *CNF) bool {
-	unitElimination(formula)
+	eliminateByUnitRule(formula)
 
 	if formula.Head == nil {
 		return true
@@ -269,13 +264,13 @@ func DPLL(formula *CNF) bool {
 	variable := getAtomicFormula(formula)
 	formulaBranch1 := formula.DeepCopy()
 
-	formulaBranch1.Push([]int{variable})
+	formulaBranch1.push([]int{variable})
 	if DPLL(formulaBranch1) {
 		return true
 	}
 
 	formulaBranch2 := formula.DeepCopy()
-	formulaBranch2.Push([]int{variable * (-1)})
+	formulaBranch2.push([]int{variable * (-1)})
 	if DPLL(formulaBranch2) {
 		return true
 	}
@@ -298,7 +293,7 @@ func main() {
 		for i := 1; i < len(os.Args); i++ {
 			f, err := os.Open(os.Args[i])
 			if err != nil {
-				log.Fatal("hoge")
+				log.Fatal("Parse Multi File Error")
 			}
 			defer f.Close()
 			cnf := &CNF{}
