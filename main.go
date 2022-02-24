@@ -11,16 +11,9 @@ import (
 	"strings"
 )
 
-type Preamble struct {
-	Format       string
-	VariablesNum int
-	ClausesNum   int
-}
-
 type CNF struct {
-	Preamble Preamble
-	Head     *Clause
-	Tail     *Clause
+	Head *Clause
+	Tail *Clause
 }
 
 type Clause struct {
@@ -68,15 +61,6 @@ func (f *CNF) Delete(clause *Clause) {
 	}
 }
 
-// Clause Node Methods
-func (c *Clause) Next() *Clause {
-	return c.next
-}
-
-func (c *Clause) Prev() *Clause {
-	return c.prev
-}
-
 func (c *Clause) Find(literal int) int {
 	res := -1
 	for index, l := range c.Literals {
@@ -99,75 +83,48 @@ func (c *Clause) Remove(index int) {
 	c.Literals = literal
 }
 
-// Parse CNF Methods
-func isComment(s string) bool {
-	return s[0:1] == "c"
+func isSkipped(s string) bool {
+	return len(s) == 0 || s[0] == '0' || s[0] == 'c' || s[0] == 'p' || s[0] == '%'
 }
 
-func isPreamble(s string) bool {
-	return s[0:1] == "p"
-}
+func (cnf *CNF) parseClause(s string) []int {
+	var clause = make([]int, 0, len(s)-1)
 
-func isStopChar(s string) bool {
-	return s[0:1] == "%"
-}
-
-func (f *CNF) parseClause(s string) bool {
-	clauseRaw := strings.Fields(s)
-	var newClauseRaw = []int{}
-
-	if clauseRaw[len(clauseRaw)-1] != "0" {
-		return false
-	}
-
-	for _, i := range clauseRaw {
-		if i == "0" {
+	for _, l := range strings.Fields(s) {
+		if l == "0" {
 			break
 		}
-		value, err := strconv.Atoi(i)
+
+		v, err := strconv.Atoi(l)
 		if err != nil {
-			return false
+			return nil
 		}
-		newClauseRaw = append(newClauseRaw, value)
+		clause = append(clause, v)
 	}
-	f.Push(newClauseRaw)
-	return true
+	return clause
 }
 
-func (f *CNF) Parse(filename string) error {
-	// Define variables
-	file, err := os.Open(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	// Start Scan file
-	scanner := bufio.NewScanner(file)
+func (cnf *CNF) Parse(f *os.File) error {
+	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
-		raw := scanner.Text()
-
-		if len(raw) == 0 {
+		t := scanner.Text()
+		if isSkipped(t) {
 			continue
-		} else if isComment(raw) {
-			fmt.Println(raw)
-		} else if isPreamble(raw) {
-			preambles := strings.Fields(raw)
-			if len(preambles) != 4 {
-				return errors.New("wrong dimacs formats")
-			}
-			f.Preamble.Format = preambles[1]
-			f.Preamble.VariablesNum, _ = strconv.Atoi(preambles[2])
-			f.Preamble.ClausesNum, _ = strconv.Atoi(preambles[3])
-		} else if isStopChar(raw) {
-			break
-		} else {
-			if res := f.parseClause(raw); !res {
-				return errors.New("wrong dimacs formats")
-			}
 		}
+		clause := cnf.parseClause(t)
+		if clause == nil {
+			return errors.New("wrong dimacs formats")
+		}
+		cnf.Push(clause)
 	}
+	cnf.showCNF()
 	return nil
+}
+
+func (cnf *CNF) showCNF() {
+	for p := cnf.Head; p != nil; p = p.next {
+		fmt.Println(p)
+	}
 }
 
 /*
@@ -179,14 +136,14 @@ func unitElimination(formula *CNF) {
 	operation := map[*Clause][]int{}
 
 	targetLiteral := 0
-	for n := formula.First(); n != nil; n = n.Next() {
+	for n := formula.First(); n != nil; n = n.next {
 		if len(n.Literals) == 1 {
 			targetLiteral = n.Literals[0]
 			break
 		}
 	}
 
-	for n := formula.First(); n != nil && targetLiteral != 0; n = n.Next() {
+	for n := formula.First(); n != nil && targetLiteral != 0; n = n.next {
 		//Lを含む節と¬Lを含む節に、Lと¬LのIndexを出力
 		literalIndex := n.Find(targetLiteral)
 		literalNotIndex := n.Find(targetLiteral * (-1))
@@ -206,6 +163,11 @@ func unitElimination(formula *CNF) {
 			}
 		}
 	}
+
+	// temporary
+	if len(operation) > 0 {
+		unitElimination(formula)
+	}
 }
 
 /*
@@ -219,7 +181,7 @@ func pureElimination(formula *CNF) {
 	// literal: true -> Pure
 	// literal: false -> Not pure
 
-	for n := formula.First(); n != nil; n = n.Next() {
+	for n := formula.First(); n != nil; n = n.next {
 		for _, l := range n.Literals {
 			if _, ok := literalMap[l*(-1)]; !ok {
 				literalMap[l] = true
@@ -231,7 +193,7 @@ func pureElimination(formula *CNF) {
 
 	for key, value := range literalMap {
 		if value {
-			for n := formula.First(); n != nil; n = n.Next() {
+			for n := formula.First(); n != nil; n = n.next {
 				literalIndex := n.Find(key)
 				if literalIndex != -1 {
 					operation = append(operation, n)
@@ -253,7 +215,7 @@ func absInt(value int) int {
 func getAtomicFormula(f *CNF) int {
 	//出現回数記録
 	variables := map[int]int{}
-	for n := f.First(); n != nil; n = n.Next() {
+	for n := f.First(); n != nil; n = n.next {
 		for _, literal := range n.Literals {
 			// intを処理するabs()を実装する
 			if value, ok := variables[absInt(literal)]; !ok {
@@ -275,7 +237,7 @@ func getAtomicFormula(f *CNF) int {
 
 func (f *CNF) DeepCopy() *CNF {
 	newFormula := &CNF{}
-	for n := f.First(); n != nil; n = n.Next() {
+	for n := f.First(); n != nil; n = n.next {
 		newInt := []int{}
 		newInt = append(newInt, n.Literals...)
 
@@ -285,7 +247,7 @@ func (f *CNF) DeepCopy() *CNF {
 }
 
 func (f *CNF) hasEmptyclause() bool {
-	for n := f.First(); n != nil; n = n.Next() {
+	for n := f.First(); n != nil; n = n.next {
 		if len(n.Literals) == 0 {
 			return true
 		}
@@ -322,16 +284,33 @@ func DPLL(formula *CNF) bool {
 }
 
 func main() {
-	for i := 1; i < len(os.Args); i++ {
-		formula := &CNF{}
-		if err := formula.Parse(os.Args[i]); err != nil {
+	if len(os.Args) == 1 {
+		cnf := &CNF{}
+		if err := cnf.Parse(os.Stdin); err != nil {
 			log.Fatal("Parse Error")
 		}
-		if DPLL(formula) {
-			fmt.Println("SATISFIABLE")
+		if DPLL(cnf) {
+			fmt.Println("sat")
 		} else {
-			fmt.Println("UNSATISFIABLE")
+			fmt.Println("unsat")
+		}
+	} else {
+		for i := 1; i < len(os.Args); i++ {
+			f, err := os.Open(os.Args[i])
+			if err != nil {
+				log.Fatal("hoge")
+			}
+			defer f.Close()
+			cnf := &CNF{}
+
+			if err := cnf.Parse(f); err != nil {
+				log.Fatal("Parse Error")
+			}
+			if DPLL(cnf) {
+				fmt.Println("sat")
+			} else {
+				fmt.Println("unsat")
+			}
 		}
 	}
-
 }

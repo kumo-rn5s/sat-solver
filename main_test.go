@@ -103,35 +103,8 @@ func TestDeleteTail(t *testing.T) {
 	}
 }
 
-func TestParse(t *testing.T) {
-	filename := "./aim-100-1_6-no-1.cnf"
-	formula := &CNF{}
-	if err := formula.Parse(filename); err != nil {
-		t.Error("CNF Parse Failure")
-	}
-	if !(formula.Preamble.Format == "cnf") ||
-		!(formula.Preamble.VariablesNum == 100) ||
-		!(formula.Preamble.ClausesNum == 160) {
-		t.Error("Preamble Parse Failure")
-	}
-
-	count := 0
-	for n := formula.First(); n != nil; n = n.Next() {
-		count++
-	}
-	if !(count == 160) {
-		t.Error("Clause Parse Failure")
-	}
-}
-
 func TestUnitElimination(t *testing.T) {
-	formula := &CNF{
-		Preamble: Preamble{
-			Format:       "cnf",
-			VariablesNum: 3,
-			ClausesNum:   4,
-		},
-	}
+	formula := &CNF{}
 
 	formula.Push([]int{1, 2, -3})
 	formula.Push([]int{1, -2})
@@ -161,13 +134,7 @@ func TestUnitElimination(t *testing.T) {
 }
 
 func TestPureElimination(t *testing.T) {
-	formula := &CNF{
-		Preamble: Preamble{
-			Format:       "cnf",
-			VariablesNum: 4,
-			ClausesNum:   4,
-		},
-	}
+	formula := &CNF{}
 
 	formula.Push([]int{1, 2})
 	formula.Push([]int{-1, 2})
@@ -184,13 +151,7 @@ func TestPureElimination(t *testing.T) {
 }
 
 func TestGetAtomicFormula(t *testing.T) {
-	formula := &CNF{
-		Preamble: Preamble{
-			Format:       "cnf",
-			VariablesNum: 6,
-			ClausesNum:   4,
-		},
-	}
+	formula := &CNF{}
 
 	formula.Push([]int{1, 2})
 	formula.Push([]int{5, 4})
@@ -205,13 +166,7 @@ func TestGetAtomicFormula(t *testing.T) {
 }
 
 func TestDPLL(t *testing.T) {
-	formula := &CNF{
-		Preamble: Preamble{
-			Format:       "cnf",
-			VariablesNum: 3,
-			ClausesNum:   4,
-		},
-	}
+	formula := &CNF{}
 
 	formula.Push([]int{1, 2, -3})
 	formula.Push([]int{1, -2})
