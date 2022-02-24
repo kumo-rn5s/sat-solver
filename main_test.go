@@ -33,7 +33,7 @@ func TestDeepCopy(t *testing.T) {
 	f.push(testb)
 	f.push(testc)
 
-	newF := f.DeepCopy()
+	newF := f.deepCopy()
 	log.Println(newF.Head.Literals)
 	log.Println(newF.Head.next.Literals)
 	log.Println(newF.Head.next.next.Literals)
@@ -104,61 +104,61 @@ func TestdeleteTail(t *testing.T) {
 }
 
 func TestEliminateByUnitRule(t *testing.T) {
-	formula := &CNF{}
+	cnf := &CNF{}
 
-	formula.push([]int{1, 2, -3})
-	formula.push([]int{1, -2})
-	formula.push([]int{-1})
-	formula.push([]int{2, 3})
+	cnf.push([]int{1, 2, -3})
+	cnf.push([]int{1, -2})
+	cnf.push([]int{-1})
+	cnf.push([]int{2, 3})
 
-	eliminateByUnitRule(formula)
+	eliminateByUnitRule(cnf)
 
-	if !reflect.DeepEqual(formula.Head.Literals, []int{2, -3}) ||
-		!reflect.DeepEqual(formula.Head.next.Literals, []int{-2}) ||
-		!reflect.DeepEqual(formula.Head.next.next.Literals, []int{2, 3}) ||
-		!reflect.ValueOf(formula.Head.next.next.next).IsNil() {
+	if !reflect.DeepEqual(cnf.Head.Literals, []int{2, -3}) ||
+		!reflect.DeepEqual(cnf.Head.next.Literals, []int{-2}) ||
+		!reflect.DeepEqual(cnf.Head.next.next.Literals, []int{2, 3}) ||
+		!reflect.ValueOf(cnf.Head.next.next.next).IsNil() {
 		t.Error("First Unit Elimination Failure")
 	}
 
-	eliminateByUnitRule(formula)
-	if !reflect.DeepEqual(formula.Head.Literals, []int{-3}) ||
-		!reflect.DeepEqual(formula.Head.next.Literals, []int{3}) ||
-		!reflect.ValueOf(formula.Head.next.next).IsNil() {
+	eliminateByUnitRule(cnf)
+	if !reflect.DeepEqual(cnf.Head.Literals, []int{-3}) ||
+		!reflect.DeepEqual(cnf.Head.next.Literals, []int{3}) ||
+		!reflect.ValueOf(cnf.Head.next.next).IsNil() {
 		t.Error("Second Unit Elimination Failure")
 	}
-	eliminateByUnitRule(formula)
-	if !reflect.DeepEqual(formula.Head.Literals, []int{}) ||
-		!reflect.ValueOf(formula.Head.next).IsNil() {
+	eliminateByUnitRule(cnf)
+	if !reflect.DeepEqual(cnf.Head.Literals, []int{}) ||
+		!reflect.ValueOf(cnf.Head.next).IsNil() {
 		t.Error("Third Unit Elimination Failure")
 	}
 }
 
 func TestEliminateByPureRule(t *testing.T) {
-	formula := &CNF{}
+	cnf := &CNF{}
 
-	formula.push([]int{1, 2})
-	formula.push([]int{-1, 2})
-	formula.push([]int{3, 4})
-	formula.push([]int{-3, -4})
+	cnf.push([]int{1, 2})
+	cnf.push([]int{-1, 2})
+	cnf.push([]int{3, 4})
+	cnf.push([]int{-3, -4})
 
-	eliminateByPureRule(formula)
+	eliminateByPureRule(cnf)
 
-	if !reflect.DeepEqual(formula.Head.Literals, []int{3, 4}) ||
-		!reflect.DeepEqual(formula.Head.next.Literals, []int{-3, -4}) ||
-		!reflect.ValueOf(formula.Head.next.next).IsNil() {
+	if !reflect.DeepEqual(cnf.Head.Literals, []int{3, 4}) ||
+		!reflect.DeepEqual(cnf.Head.next.Literals, []int{-3, -4}) ||
+		!reflect.ValueOf(cnf.Head.next.next).IsNil() {
 		t.Error("First Pure Elimination Failure")
 	}
 }
 
-func TestGetAtomicFormula(t *testing.T) {
-	formula := &CNF{}
+func TestGetAtomiccnf(t *testing.T) {
+	cnf := &CNF{}
 
-	formula.push([]int{1, 2})
-	formula.push([]int{5, 4})
-	formula.push([]int{3, -5})
-	formula.push([]int{5, -6})
+	cnf.push([]int{1, 2})
+	cnf.push([]int{5, 4})
+	cnf.push([]int{3, -5})
+	cnf.push([]int{5, -6})
 
-	result := getAtomicFormula(formula)
+	result := getAtomicFormula(cnf)
 
 	if result != 5 {
 		t.Error("Get Atomic Formula Error")
@@ -166,13 +166,13 @@ func TestGetAtomicFormula(t *testing.T) {
 }
 
 func TestDPLL(t *testing.T) {
-	formula := &CNF{}
+	cnf := &CNF{}
 
-	formula.push([]int{1, 2, -3})
-	formula.push([]int{1, -2})
-	formula.push([]int{-1})
-	formula.push([]int{2, 3})
-	if DPLL(formula) {
+	cnf.push([]int{1, 2, -3})
+	cnf.push([]int{1, -2})
+	cnf.push([]int{-1})
+	cnf.push([]int{2, 3})
+	if DPLL(cnf) {
 		t.Error("DPLL Error")
 	}
 }

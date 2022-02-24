@@ -22,31 +22,30 @@ type Clause struct {
 	prev     *Clause
 }
 
-func (f *CNF) push(v []int) {
+func (cnf *CNF) push(v []int) {
 	n := &Clause{Literals: v}
-	if f.Head == nil {
-		f.Head = n
-		f.Tail = n
+	if cnf.Head == nil {
+		cnf.Head = n
+		cnf.Tail = n
 	} else {
-		f.Tail.next = n
-		n.prev = f.Tail
-		f.Tail = n
+		cnf.Tail.next = n
+		n.prev = cnf.Tail
+		cnf.Tail = n
 	}
-
 }
 
-func (f *CNF) delete(clause *Clause) {
-	if clause == f.Head && clause == f.Tail {
-		f.Head = nil
-		f.Tail = nil
-	} else if clause == f.Head {
+func (cnf *CNF) delete(clause *Clause) {
+	if clause == cnf.Head && clause == cnf.Tail {
+		cnf.Head = nil
+		cnf.Tail = nil
+	} else if clause == cnf.Head {
 		newHead := clause.next
 		clause.next = nil
-		f.Head = newHead
-	} else if clause == f.Tail {
+		cnf.Head = newHead
+	} else if clause == cnf.Tail {
 		newTail := clause.prev
 		newTail.next = nil
-		f.Tail = newTail
+		cnf.Tail = newTail
 	} else if clause != nil {
 		prev := clause.prev
 		next := clause.next
@@ -82,21 +81,27 @@ func isSkipped(s string) bool {
 	return len(s) == 0 || s[0] == '0' || s[0] == 'c' || s[0] == 'p' || s[0] == '%'
 }
 
-func (cnf *CNF) parseClause(s string) []int {
+func (cnf *CNF) parseClause(s string) error {
 	var clause = make([]int, 0, len(s)-1)
 
-	for _, l := range strings.Fields(s) {
-		if l == "0" {
+	for _, v := range strings.Fields(s) {
+		if v == "0" {
 			break
 		}
 
-		v, err := strconv.Atoi(l)
+		num, err := strconv.Atoi(v)
 		if err != nil {
-			return nil
+			return errors.New("wrong dimacs formats")
 		}
-		clause = append(clause, v)
+		clause = append(clause, num)
 	}
-	return clause
+
+	if clause == nil {
+		return errors.New("wrong dimacs formats")
+	}
+
+	cnf.push(clause)
+	return nil
 }
 
 func (cnf *CNF) Parse(f *os.File) error {
@@ -106,11 +111,10 @@ func (cnf *CNF) Parse(f *os.File) error {
 		if isSkipped(t) {
 			continue
 		}
-		clause := cnf.parseClause(t)
-		if clause == nil {
-			return errors.New("wrong dimacs formats")
+		if err := cnf.parseClause(t); err != nil {
+			return err
 		}
-		cnf.push(clause)
+
 	}
 	cnf.showCNF()
 	return nil
@@ -126,19 +130,19 @@ func (cnf *CNF) showCNF() {
 1リテラル規則（one literal rule, unit rule）
 リテラル L 1つだけの節があれば、L を含む節を除去し、他の節の否定リテラル ¬L を消去する。
 */
-func eliminateByUnitRule(formula *CNF) {
+func eliminateByUnitRule(cnf *CNF) {
 
 	operation := map[*Clause][]int{}
 
 	targetLiteral := 0
-	for n := formula.Head; n != nil; n = n.next {
-		if len(n.Literals) == 1 {
-			targetLiteral = n.Literals[0]
+	for p := cnf.Head; p != nil; p = p.next {
+		if len(p.Literals) == 1 {
+			targetLiteral = p.Literals[0]
 			break
 		}
 	}
 
-	for n := formula.Head; n != nil && targetLiteral != 0; n = n.next {
+	for n := cnf.Head; n != nil && targetLiteral != 0; n = n.next {
 		//Lを含む節と¬Lを含む節に、Lと¬LのIndexを出力
 		literalIndex := n.find(targetLiteral)
 		literalNotIndex := n.find(targetLiteral * (-1))
@@ -148,20 +152,20 @@ func eliminateByUnitRule(formula *CNF) {
 	}
 
 	// 統一して削除
-	for clause, value := range operation {
+	for clause, v := range operation {
 		if clause != nil {
-			if value[1] != -1 {
-				clause.remove(value[1])
+			if v[1] != -1 {
+				clause.remove(v[1])
 			}
-			if value[0] != -1 {
-				formula.delete(clause)
+			if v[0] != -1 {
+				cnf.delete(clause)
 			}
 		}
 	}
 
 	// temporary
 	if len(operation) > 0 {
-		eliminateByUnitRule(formula)
+		eliminateByUnitRule(cnf)
 	}
 }
 
@@ -169,53 +173,53 @@ func eliminateByUnitRule(formula *CNF) {
 純リテラル規則（pure literal rule, affirmative-nagative rule）
 節集合の中に否定と肯定の両方が現れないリテラル（純リテラル） L があれば、L を含む節を除去する。
 */
-func eliminateByPureRule(formula *CNF) {
+func eliminateByPureRule(cnf *CNF) {
 
 	operation := []*Clause{}
 	literalMap := make(map[int]bool)
 	// literal: true -> Pure
 	// literal: false -> Not pure
 
-	for n := formula.Head; n != nil; n = n.next {
-		for _, l := range n.Literals {
-			if _, ok := literalMap[l*(-1)]; !ok {
-				literalMap[l] = true
+	for p := cnf.Head; p != nil; p = p.next {
+		for _, v := range p.Literals {
+			if _, ok := literalMap[v*(-1)]; !ok {
+				literalMap[v] = true
 			} else {
-				literalMap[l*(-1)] = false
+				literalMap[v*(-1)] = false
 			}
 		}
 	}
 
-	for key, value := range literalMap {
-		if value {
-			for n := formula.Head; n != nil; n = n.next {
-				literalIndex := n.find(key)
+	for k, v := range literalMap {
+		if v {
+			for p := cnf.Head; p != nil; p = p.next {
+				literalIndex := p.find(k)
 				if literalIndex != -1 {
-					operation = append(operation, n)
+					operation = append(operation, p)
 				}
 			}
 		}
 	}
 	// 統一して削除
 	for _, clause := range operation {
-		formula.delete(clause)
+		cnf.delete(clause)
 	}
 }
 
-func absInt(value int) int {
-	return int(math.Abs(float64(value)))
+func absInt(v int) int {
+	return int(math.Abs(float64(v)))
 }
 
 // moms heuristicへの準備
-func getAtomicFormula(f *CNF) int {
+func getAtomicFormula(cnf *CNF) int {
 	//出現回数記録
 	variables := map[int]int{}
-	for n := f.Head; n != nil; n = n.next {
+	for n := cnf.Head; n != nil; n = n.next {
 		for _, literal := range n.Literals {
 			// intを処理するabs()を実装する
-			if value, ok := variables[absInt(literal)]; !ok {
-				value++
-				variables[absInt(literal)] = value
+			if v, ok := variables[absInt(literal)]; !ok {
+				v++
+				variables[absInt(literal)] = v
 			}
 		}
 	}
@@ -230,19 +234,19 @@ func getAtomicFormula(f *CNF) int {
 	return maxInt
 }
 
-func (f *CNF) DeepCopy() *CNF {
-	newFormula := &CNF{}
-	for n := f.Head; n != nil; n = n.next {
+func (cnf *CNF) deepCopy() *CNF {
+	newcnf := &CNF{}
+	for n := cnf.Head; n != nil; n = n.next {
 		newInt := []int{}
 		newInt = append(newInt, n.Literals...)
 
-		newFormula.push(newInt)
+		newcnf.push(newInt)
 	}
-	return newFormula
+	return newcnf
 }
 
-func (f *CNF) hasEmptyclause() bool {
-	for n := f.Head; n != nil; n = n.next {
+func (cnf *CNF) hasEmptyclause() bool {
+	for n := cnf.Head; n != nil; n = n.next {
 		if len(n.Literals) == 0 {
 			return true
 		}
@@ -250,28 +254,28 @@ func (f *CNF) hasEmptyclause() bool {
 	return false
 }
 
-func DPLL(formula *CNF) bool {
-	eliminateByUnitRule(formula)
+func DPLL(cnf *CNF) bool {
+	eliminateByUnitRule(cnf)
 
-	if formula.Head == nil {
+	if cnf.Head == nil {
 		return true
 	}
 
-	if formula.hasEmptyclause() {
+	if cnf.hasEmptyclause() {
 		return false
 	}
 
-	variable := getAtomicFormula(formula)
-	formulaBranch1 := formula.DeepCopy()
+	variable := getAtomicFormula(cnf)
+	cnfBranch1 := cnf.deepCopy()
 
-	formulaBranch1.push([]int{variable})
-	if DPLL(formulaBranch1) {
+	cnfBranch1.push([]int{variable})
+	if DPLL(cnfBranch1) {
 		return true
 	}
 
-	formulaBranch2 := formula.DeepCopy()
-	formulaBranch2.push([]int{variable * (-1)})
-	if DPLL(formulaBranch2) {
+	cnfBranch2 := cnf.deepCopy()
+	cnfBranch2.push([]int{variable * (-1)})
+	if DPLL(cnfBranch2) {
 		return true
 	}
 
