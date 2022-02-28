@@ -23,6 +23,7 @@ type Clause struct {
 }
 
 func (cnf *CNF) push(v []int) {
+	// 節を引数とする
 	n := &Clause{Literals: v}
 	if cnf.Head == nil {
 		cnf.Head = n
@@ -35,23 +36,20 @@ func (cnf *CNF) push(v []int) {
 }
 
 func (cnf *CNF) delete(clause *Clause) {
+	// Head == Tail Nodeが１つしかない
 	if clause == cnf.Head && clause == cnf.Tail {
 		cnf.Head = nil
 		cnf.Tail = nil
 	} else if clause == cnf.Head {
-		newHead := clause.next
-		clause.next = nil
-		cnf.Head = newHead
+		// 最初のNodeを消す
+		cnf.Head = clause.next
+		clause.next.prev = nil
 	} else if clause == cnf.Tail {
-		newTail := clause.prev
-		newTail.next = nil
-		cnf.Tail = newTail
-	} else if clause != nil {
-		prev := clause.prev
-		next := clause.next
-
-		prev.next = clause.next
-		next.prev = clause.prev
+		//　最後のNodeを消す
+		cnf.Tail = clause.prev
+		clause.prev.next = nil
+	} else {
+		clause.prev.next, clause.next.prev = clause.next, clause.prev
 	}
 }
 
@@ -121,8 +119,29 @@ func (cnf *CNF) Parse(f *os.File) error {
 }
 
 func (cnf *CNF) showCNF() {
+	return
 	for p := cnf.Head; p != nil; p = p.next {
 		fmt.Println(p)
+	}
+}
+
+func (cnf *CNF) deleteClause(target int) {
+	for p := cnf.Head; p != nil; p = p.next {
+		//Lを含む節と¬Lを含む節に、Lと¬LのIndexを出力
+		index := p.find(target)
+		if index != -1 {
+			cnf.delete(p)
+		}
+	}
+}
+
+func (cnf *CNF) deleteLiteral(target int) {
+	for p := cnf.Head; p != nil; p = p.next {
+		//Lを含む節と¬Lを含む節に、Lと¬LのIndexを出力
+		index := p.find(target)
+		if index != -1 {
+			p.remove(index)
+		}
 	}
 }
 
@@ -131,41 +150,13 @@ func (cnf *CNF) showCNF() {
 リテラル L 1つだけの節があれば、L を含む節を除去し、他の節の否定リテラル ¬L を消去する。
 */
 func eliminateByUnitRule(cnf *CNF) {
-
-	operation := map[*Clause][]int{}
-
-	targetLiteral := 0
 	for p := cnf.Head; p != nil; p = p.next {
+		//ループ開始
 		if len(p.Literals) == 1 {
-			targetLiteral = p.Literals[0]
-			break
+			cnf.deleteClause(p.Literals[0])
+			cnf.deleteLiteral(-p.Literals[0])
+			p.next = cnf.Head
 		}
-	}
-
-	for n := cnf.Head; n != nil && targetLiteral != 0; n = n.next {
-		//Lを含む節と¬Lを含む節に、Lと¬LのIndexを出力
-		literalIndex := n.find(targetLiteral)
-		literalNotIndex := n.find(targetLiteral * (-1))
-		if literalIndex*literalNotIndex != 1 {
-			operation[n] = []int{literalIndex, literalNotIndex}
-		}
-	}
-
-	// 統一して削除
-	for clause, v := range operation {
-		if clause != nil {
-			if v[1] != -1 {
-				clause.remove(v[1])
-			}
-			if v[0] != -1 {
-				cnf.delete(clause)
-			}
-		}
-	}
-
-	// temporary
-	if len(operation) > 0 {
-		eliminateByUnitRule(cnf)
 	}
 }
 
