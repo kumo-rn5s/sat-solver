@@ -22,9 +22,8 @@ type Clause struct {
 	prev     *Clause
 }
 
-func (cnf *CNF) push(v []int) {
+func (cnf *CNF) push(n *Clause) {
 	// 節を引数とする
-	n := &Clause{Literals: v}
 	if cnf.Head == nil {
 		cnf.Head = n
 		cnf.Tail = n
@@ -98,7 +97,7 @@ func (cnf *CNF) parseClause(s string) error {
 		return errors.New("wrong dimacs formats")
 	}
 
-	cnf.push(clause)
+	cnf.push(&Clause{Literals: clause})
 	return nil
 }
 
@@ -114,12 +113,11 @@ func (cnf *CNF) Parse(f *os.File) error {
 		}
 
 	}
-	cnf.showCNF()
+	//cnf.showCNF()
 	return nil
 }
 
-func (cnf *CNF) showCNF() {
-	return
+func (cnf *CNF) ShowCNF() {
 	for p := cnf.Head; p != nil; p = p.next {
 		fmt.Println(p)
 	}
@@ -149,7 +147,7 @@ func (cnf *CNF) deleteLiteral(target int) {
 1リテラル規則（one literal rule, unit rule）
 リテラル L 1つだけの節があれば、L を含む節を除去し、他の節の否定リテラル ¬L を消去する。
 */
-func eliminateByUnitRule(cnf *CNF) {
+func simplifyByUnitRule(cnf *CNF) {
 	for p := cnf.Head; p != nil; p = p.next {
 		//ループ開始
 		if len(p.Literals) == 1 {
@@ -164,9 +162,7 @@ func eliminateByUnitRule(cnf *CNF) {
 純リテラル規則（pure literal rule, affirmative-nagative rule）
 節集合の中に否定と肯定の両方が現れないリテラル（純リテラル） L があれば、L を含む節を除去する。
 */
-func eliminateByPureRule(cnf *CNF) {
-
-	operation := []*Clause{}
+func simplifyByPureRule(cnf *CNF) {
 	literalMap := make(map[int]bool)
 	// literal: true -> Pure
 	// literal: false -> Not pure
@@ -177,6 +173,7 @@ func eliminateByPureRule(cnf *CNF) {
 				literalMap[v] = true
 			} else {
 				literalMap[v*(-1)] = false
+				literalMap[v] = false
 			}
 		}
 	}
@@ -184,16 +181,9 @@ func eliminateByPureRule(cnf *CNF) {
 	for k, v := range literalMap {
 		if v {
 			for p := cnf.Head; p != nil; p = p.next {
-				literalIndex := p.find(k)
-				if literalIndex != -1 {
-					operation = append(operation, p)
-				}
+				cnf.deleteClause(k)
 			}
 		}
-	}
-	// 統一して削除
-	for _, clause := range operation {
-		cnf.delete(clause)
 	}
 }
 
@@ -231,7 +221,7 @@ func (cnf *CNF) deepCopy() *CNF {
 		newInt := []int{}
 		newInt = append(newInt, n.Literals...)
 
-		newcnf.push(newInt)
+		newcnf.push(&Clause{Literals: newInt})
 	}
 	return newcnf
 }
@@ -246,7 +236,8 @@ func (cnf *CNF) hasEmptyclause() bool {
 }
 
 func DPLL(cnf *CNF) bool {
-	eliminateByUnitRule(cnf)
+	simplifyByUnitRule(cnf)
+	simplifyByPureRule(cnf)
 
 	if cnf.Head == nil {
 		return true
@@ -259,18 +250,14 @@ func DPLL(cnf *CNF) bool {
 	variable := getAtomicFormula(cnf)
 	cnfBranch1 := cnf.deepCopy()
 
-	cnfBranch1.push([]int{variable})
+	cnfBranch1.push(&Clause{Literals: []int{variable}})
 	if DPLL(cnfBranch1) {
 		return true
 	}
 
 	cnfBranch2 := cnf.deepCopy()
-	cnfBranch2.push([]int{variable * (-1)})
-	if DPLL(cnfBranch2) {
-		return true
-	}
-
-	return false
+	cnfBranch2.push(&Clause{Literals: []int{-variable}})
+	return DPLL(cnfBranch2)
 }
 
 func main() {
