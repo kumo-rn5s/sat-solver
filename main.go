@@ -169,6 +169,13 @@ func simplifyByPureRule(cnf *CNF) {
 
 	for p := cnf.Head; p != nil; p = p.next {
 		for _, v := range p.Literals {
+			//すでに存在している場合飛ばす
+			if _, ok := literalMap[v]; ok {
+				continue
+			}
+			// if Negative Literal exist in Map
+			// Literal & Negative Literal -> Not pure
+			// else Literal -> Pure
 			if _, ok := literalMap[v*(-1)]; !ok {
 				literalMap[v] = true
 			} else {
