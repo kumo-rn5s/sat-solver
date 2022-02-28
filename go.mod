@@ -1,3 +1,3 @@
-module github.com/FirosStuart/SAT-solver
+module github.com/FirosStuart/sat-solver
 
 go 1.17
