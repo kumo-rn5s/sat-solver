@@ -23,7 +23,6 @@ type Clause struct {
 }
 
 func (cnf *CNF) push(n *Clause) {
-	// 節を引数とする
 	if cnf.Head == nil {
 		cnf.Head = n
 		cnf.Tail = n
@@ -79,7 +78,7 @@ func isSkipped(s string) bool {
 }
 
 func (cnf *CNF) parseClause(s string) error {
-	var clause = make([]int, 0, len(s)-1)
+	var literals = make([]int, 0, len(s)-1)
 
 	for _, v := range strings.Fields(s) {
 		if v == "0" {
@@ -90,14 +89,14 @@ func (cnf *CNF) parseClause(s string) error {
 		if err != nil {
 			return errors.New("wrong dimacs formats")
 		}
-		clause = append(clause, num)
+		literals = append(literals, num)
 	}
 
-	if clause == nil {
+	if literals == nil {
 		return errors.New("wrong dimacs formats")
 	}
 
-	cnf.push(&Clause{Literals: clause})
+	cnf.push(&Clause{Literals: literals})
 	return nil
 }
 
@@ -111,9 +110,7 @@ func (cnf *CNF) Parse(f *os.File) error {
 		if err := cnf.parseClause(t); err != nil {
 			return err
 		}
-
 	}
-	//cnf.showCNF()
 	return nil
 }
 
@@ -125,7 +122,6 @@ func (cnf *CNF) ShowCNF() {
 
 func (cnf *CNF) deleteClause(target int) {
 	for p := cnf.Head; p != nil; p = p.next {
-		//Lを含む節と¬Lを含む節に、Lと¬LのIndexを出力
 		index := p.find(target)
 		if index != -1 {
 			cnf.delete(p)
@@ -135,7 +131,6 @@ func (cnf *CNF) deleteClause(target int) {
 
 func (cnf *CNF) deleteLiteral(target int) {
 	for p := cnf.Head; p != nil; p = p.next {
-		//Lを含む節と¬Lを含む節に、Lと¬LのIndexを出力
 		index := p.find(target)
 		if index != -1 {
 			p.remove(index)
@@ -162,33 +157,36 @@ func simplifyByUnitRule(cnf *CNF) {
 純リテラル規則（pure literal rule, affirmative-nagative rule）
 節集合の中に否定と肯定の両方が現れないリテラル（純リテラル） L があれば、L を含む節を除去する。
 */
+type purity struct {
+	positive bool
+	negative bool
+}
+
 func simplifyByPureRule(cnf *CNF) {
-	literalMap := make(map[int]bool)
-	// literal: true -> Pure
-	// literal: false -> Not pure
+	literalPurityMap := make(map[int]purity)
 
 	for p := cnf.Head; p != nil; p = p.next {
 		for _, v := range p.Literals {
-			//すでに存在している場合飛ばす
-			if _, ok := literalMap[v]; ok {
-				continue
+			newPurity := purity{}
+			if old, ok := literalPurityMap[absInt(v)]; ok {
+				newPurity = old
 			}
-			// if Negative Literal exist in Map
-			// Literal & Negative Literal -> Not pure
-			// else Literal -> Pure
-			if _, ok := literalMap[v*(-1)]; !ok {
-				literalMap[v] = true
+
+			if v > 0 {
+				newPurity.positive = true
 			} else {
-				literalMap[v*(-1)] = false
-				literalMap[v] = false
+				newPurity.negative = true
 			}
+			literalPurityMap[absInt(v)] = newPurity
 		}
 	}
 
-	for k, v := range literalMap {
-		if v {
-			for p := cnf.Head; p != nil; p = p.next {
+	for k, v := range literalPurityMap {
+		if v.positive != v.negative {
+			if v.positive {
 				cnf.deleteClause(k)
+			} else {
+				cnf.deleteClause(-k)
 			}
 		}
 	}
@@ -204,7 +202,6 @@ func getAtomicFormula(cnf *CNF) int {
 	variables := map[int]int{}
 	for n := cnf.Head; n != nil; n = n.next {
 		for _, literal := range n.Literals {
-			// intを処理するabs()を実装する
 			if v, ok := variables[absInt(literal)]; !ok {
 				v++
 				variables[absInt(literal)] = v
@@ -227,7 +224,6 @@ func (cnf *CNF) deepCopy() *CNF {
 	for n := cnf.Head; n != nil; n = n.next {
 		newInt := []int{}
 		newInt = append(newInt, n.Literals...)
-
 		newcnf.push(&Clause{Literals: newInt})
 	}
 	return newcnf
