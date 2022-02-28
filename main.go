@@ -200,8 +200,8 @@ func absInt(v int) int {
 func getAtomicFormula(cnf *CNF) int {
 	//出現回数記録
 	variables := map[int]int{}
-	for n := cnf.Head; n != nil; n = n.next {
-		for _, literal := range n.Literals {
+	for p := cnf.Head; p != nil; p = p.next {
+		for _, literal := range p.Literals {
 			if v, ok := variables[absInt(literal)]; !ok {
 				v++
 				variables[absInt(literal)] = v
@@ -221,15 +221,15 @@ func getAtomicFormula(cnf *CNF) int {
 
 func (cnf *CNF) deepCopy() *CNF {
 	newcnf := &CNF{}
-	for n := cnf.Head; n != nil; n = n.next {
-		newcnf.push(&Clause{Literals: n.Literals})
+	for p := cnf.Head; p != nil; p = p.next {
+		newcnf.push(&Clause{Literals: append([]int{}, p.Literals...)})
 	}
 	return newcnf
 }
 
 func (cnf *CNF) hasEmptyclause() bool {
-	for n := cnf.Head; n != nil; n = n.next {
-		if len(n.Literals) == 0 {
+	for p := cnf.Head; p != nil; p = p.next {
+		if len(p.Literals) == 0 {
 			return true
 		}
 	}
