@@ -222,9 +222,7 @@ func getAtomicFormula(cnf *CNF) int {
 func (cnf *CNF) deepCopy() *CNF {
 	newcnf := &CNF{}
 	for n := cnf.Head; n != nil; n = n.next {
-		newInt := []int{}
-		newInt = append(newInt, n.Literals...)
-		newcnf.push(&Clause{Literals: newInt})
+		newcnf.push(&Clause{Literals: n.Literals})
 	}
 	return newcnf
 }
