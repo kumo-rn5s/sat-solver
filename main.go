@@ -22,6 +22,8 @@ type Clause struct {
 	prev     *Clause
 }
 
+var CLAUSEEND = "0"
+
 func (cnf *CNF) push(clause *Clause) {
 	if cnf.Head == nil && cnf.Tail == nil {
 		cnf.Head = clause
@@ -33,16 +35,13 @@ func (cnf *CNF) push(clause *Clause) {
 }
 
 func (cnf *CNF) delete(clause *Clause) {
-	// Head == Tail Nodeが１つしかない
 	if clause == cnf.Head && clause == cnf.Tail {
 		cnf.Head = nil
 		cnf.Tail = nil
 	} else if clause == cnf.Head {
-		// 最初のNodeを消す
 		cnf.Head = clause.next
 		clause.next.prev = nil
 	} else if clause == cnf.Tail {
-		//　最後のNodeを消す
 		cnf.Tail = clause.prev
 		clause.prev.next = nil
 	} else {
@@ -50,14 +49,13 @@ func (cnf *CNF) delete(clause *Clause) {
 	}
 }
 
-func (c *Clause) find(literal int) int {
-	res := -1
+func (c *Clause) findIndex(literal int) (int, bool) {
 	for index, l := range c.Literals {
 		if l == literal {
-			res = index
+			return index, true
 		}
 	}
-	return res
+	return -1, false
 }
 
 func (c *Clause) remove(index int) {
@@ -72,7 +70,7 @@ func (cnf *CNF) parseClause(s string) error {
 	var literals = make([]int, 0, len(s)-1)
 
 	for _, v := range strings.Fields(s) {
-		if v == "0" {
+		if v == CLAUSEEND {
 			break
 		}
 
@@ -113,8 +111,7 @@ func (cnf *CNF) ShowCNF() {
 
 func (cnf *CNF) deleteClause(target int) {
 	for p := cnf.Head; p != nil; p = p.next {
-		index := p.find(target)
-		if index != -1 {
+		if _, found := p.findIndex(target); found {
 			cnf.delete(p)
 		}
 	}
@@ -122,8 +119,7 @@ func (cnf *CNF) deleteClause(target int) {
 
 func (cnf *CNF) deleteLiteral(target int) {
 	for p := cnf.Head; p != nil; p = p.next {
-		index := p.find(target)
-		if index != -1 {
+		if index, found := p.findIndex(target); found {
 			p.remove(index)
 		}
 	}
@@ -135,7 +131,6 @@ func (cnf *CNF) deleteLiteral(target int) {
 */
 func simplifyByUnitRule(cnf *CNF) {
 	for p := cnf.Head; p != nil; p = p.next {
-		//ループ開始
 		if len(p.Literals) == 1 {
 			cnf.deleteClause(p.Literals[0])
 			cnf.deleteLiteral(-p.Literals[0])
@@ -153,23 +148,27 @@ type purity struct {
 	negative bool
 }
 
+func upsertPurityMap(m map[int]purity, clause *Clause) map[int]purity {
+	for _, v := range clause.Literals {
+		newPurity := purity{}
+		if old, ok := m[absInt(v)]; ok {
+			newPurity = old
+		}
+		if v > 0 {
+			newPurity.positive = true
+		} else {
+			newPurity.negative = true
+		}
+		m[absInt(v)] = newPurity
+	}
+	return m
+}
+
 func simplifyByPureRule(cnf *CNF) {
 	literalPurityMap := make(map[int]purity)
 
 	for p := cnf.Head; p != nil; p = p.next {
-		for _, v := range p.Literals {
-			newPurity := purity{}
-			if old, ok := literalPurityMap[absInt(v)]; ok {
-				newPurity = old
-			}
-
-			if v > 0 {
-				newPurity.positive = true
-			} else {
-				newPurity.negative = true
-			}
-			literalPurityMap[absInt(v)] = newPurity
-		}
+		literalPurityMap = upsertPurityMap(literalPurityMap, p)
 	}
 
 	for k, v := range literalPurityMap {
@@ -189,7 +188,6 @@ func absInt(v int) int {
 
 // moms heuristicへの準備
 func getAtomicFormula(cnf *CNF) int {
-	//出現回数記録
 	variables := map[int]int{}
 	for p := cnf.Head; p != nil; p = p.next {
 		for _, literal := range p.Literals {
@@ -227,7 +225,7 @@ func (cnf *CNF) hasEmptyclause() bool {
 	return false
 }
 
-func DPLL(cnf *CNF) bool {
+func dpll(cnf *CNF) bool {
 	simplifyByUnitRule(cnf)
 	simplifyByPureRule(cnf)
 
@@ -243,13 +241,21 @@ func DPLL(cnf *CNF) bool {
 	cnfBranch1 := cnf.deepCopy()
 
 	cnfBranch1.push(&Clause{Literals: []int{variable}})
-	if DPLL(cnfBranch1) {
+	if dpll(cnfBranch1) {
 		return true
 	}
 
 	cnfBranch2 := cnf.deepCopy()
 	cnfBranch2.push(&Clause{Literals: []int{-variable}})
-	return DPLL(cnfBranch2)
+	return dpll(cnfBranch2)
+}
+
+func (cnf *CNF) IsSatisfied() {
+	if dpll(cnf) {
+		fmt.Println("sat")
+	} else {
+		fmt.Println("unsat")
+	}
 }
 
 func main() {
@@ -258,11 +264,8 @@ func main() {
 		if err := cnf.Parse(os.Stdin); err != nil {
 			log.Fatal("Parse Error")
 		}
-		if DPLL(cnf) {
-			fmt.Println("sat")
-		} else {
-			fmt.Println("unsat")
-		}
+
+		cnf.IsSatisfied()
 	} else {
 		for i := 1; i < len(os.Args); i++ {
 			f, err := os.Open(os.Args[i])
@@ -270,16 +273,13 @@ func main() {
 				log.Fatal("Parse Multi File Error")
 			}
 			defer f.Close()
-			cnf := &CNF{}
 
+			cnf := &CNF{}
 			if err := cnf.Parse(f); err != nil {
 				log.Fatal("Parse Error")
 			}
-			if DPLL(cnf) {
-				fmt.Println("sat")
-			} else {
-				fmt.Println("unsat")
-			}
+
+			cnf.IsSatisfied()
 		}
 	}
 }
