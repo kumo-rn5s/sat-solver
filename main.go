@@ -22,15 +22,14 @@ type Clause struct {
 	prev     *Clause
 }
 
-func (cnf *CNF) push(n *Clause) {
-	if cnf.Head == nil {
-		cnf.Head = n
-		cnf.Tail = n
+func (cnf *CNF) push(clause *Clause) {
+	if cnf.Head == nil && cnf.Tail == nil {
+		cnf.Head = clause
 	} else {
-		cnf.Tail.next = n
-		n.prev = cnf.Tail
-		cnf.Tail = n
+		clause.prev = cnf.Tail
+		clause.prev.next = clause
 	}
+	cnf.Tail = clause
 }
 
 func (cnf *CNF) delete(clause *Clause) {
@@ -62,15 +61,7 @@ func (c *Clause) find(literal int) int {
 }
 
 func (c *Clause) remove(index int) {
-	var literal []int
-	if index == 0 {
-		literal = c.Literals[1:]
-	} else if index == len(c.Literals)-1 {
-		literal = c.Literals[:len(c.Literals)-1]
-	} else {
-		literal = append(c.Literals[:index], c.Literals[index+1:]...)
-	}
-	c.Literals = literal
+	c.Literals = append(c.Literals[:index], c.Literals[index+1:]...)
 }
 
 func isSkipped(s string) bool {
