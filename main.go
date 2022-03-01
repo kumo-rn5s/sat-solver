@@ -12,44 +12,44 @@ import (
 )
 
 type CNF struct {
-	Head *Clause
-	Tail *Clause
+	Head *clause
+	Tail *clause
 }
 
-type Clause struct {
+type clause struct {
 	Literals []int
-	next     *Clause
-	prev     *Clause
+	next     *clause
+	prev     *clause
 }
 
-var CLAUSEEND = "0"
+const ClauseEND = "0"
 
-func (cnf *CNF) push(clause *Clause) {
+func (cnf *CNF) push(c *clause) {
 	if cnf.Head == nil && cnf.Tail == nil {
-		cnf.Head = clause
+		cnf.Head = c
 	} else {
-		clause.prev = cnf.Tail
-		clause.prev.next = clause
+		c.prev = cnf.Tail
+		c.prev.next = c
 	}
-	cnf.Tail = clause
+	cnf.Tail = c
 }
 
-func (cnf *CNF) delete(clause *Clause) {
-	if clause == cnf.Head && clause == cnf.Tail {
+func (cnf *CNF) delete(c *clause) {
+	if c == cnf.Head && c == cnf.Tail {
 		cnf.Head = nil
 		cnf.Tail = nil
-	} else if clause == cnf.Head {
-		cnf.Head = clause.next
-		clause.next.prev = nil
-	} else if clause == cnf.Tail {
-		cnf.Tail = clause.prev
-		clause.prev.next = nil
+	} else if c == cnf.Head {
+		cnf.Head = c.next
+		c.next.prev = nil
+	} else if c == cnf.Tail {
+		cnf.Tail = c.prev
+		c.prev.next = nil
 	} else {
-		clause.prev.next, clause.next.prev = clause.next, clause.prev
+		c.prev.next, c.next.prev = c.next, c.prev
 	}
 }
 
-func (c *Clause) findIndex(literal int) (int, bool) {
+func (c *clause) findIndex(literal int) (int, bool) {
 	for index, l := range c.Literals {
 		if l == literal {
 			return index, true
@@ -58,7 +58,7 @@ func (c *Clause) findIndex(literal int) (int, bool) {
 	return -1, false
 }
 
-func (c *Clause) remove(index int) {
+func (c *clause) remove(index int) {
 	c.Literals = append(c.Literals[:index], c.Literals[index+1:]...)
 }
 
@@ -70,7 +70,7 @@ func (cnf *CNF) parseClause(s string) error {
 	var literals = make([]int, 0, len(s)-1)
 
 	for _, v := range strings.Fields(s) {
-		if v == CLAUSEEND {
+		if v == ClauseEND {
 			break
 		}
 
@@ -85,7 +85,7 @@ func (cnf *CNF) parseClause(s string) error {
 		return errors.New("wrong dimacs formats")
 	}
 
-	cnf.push(&Clause{Literals: literals})
+	cnf.push(&clause{Literals: literals})
 	return nil
 }
 
@@ -101,12 +101,6 @@ func (cnf *CNF) Parse(f *os.File) error {
 		}
 	}
 	return nil
-}
-
-func (cnf *CNF) ShowCNF() {
-	for p := cnf.Head; p != nil; p = p.next {
-		fmt.Println(p)
-	}
 }
 
 func (cnf *CNF) deleteClause(target int) {
@@ -148,8 +142,8 @@ type purity struct {
 	negative bool
 }
 
-func upsertPurityMap(m map[int]purity, clause *Clause) map[int]purity {
-	for _, v := range clause.Literals {
+func upsertPurityMap(m map[int]purity, c *clause) map[int]purity {
+	for _, v := range c.Literals {
 		newPurity := purity{}
 		if old, ok := m[absInt(v)]; ok {
 			newPurity = old
@@ -211,7 +205,7 @@ func getAtomicFormula(cnf *CNF) int {
 func (cnf *CNF) deepCopy() *CNF {
 	newcnf := &CNF{}
 	for p := cnf.Head; p != nil; p = p.next {
-		newcnf.push(&Clause{Literals: append([]int{}, p.Literals...)})
+		newcnf.push(&clause{Literals: append([]int{}, p.Literals...)})
 	}
 	return newcnf
 }
@@ -240,22 +234,18 @@ func dpll(cnf *CNF) bool {
 	variable := getAtomicFormula(cnf)
 	cnfBranch1 := cnf.deepCopy()
 
-	cnfBranch1.push(&Clause{Literals: []int{variable}})
+	cnfBranch1.push(&clause{Literals: []int{variable}})
 	if dpll(cnfBranch1) {
 		return true
 	}
 
 	cnfBranch2 := cnf.deepCopy()
-	cnfBranch2.push(&Clause{Literals: []int{-variable}})
+	cnfBranch2.push(&clause{Literals: []int{-variable}})
 	return dpll(cnfBranch2)
 }
 
-func (cnf *CNF) IsSatisfied() {
-	if dpll(cnf) {
-		fmt.Println("sat")
-	} else {
-		fmt.Println("unsat")
-	}
+func (cnf *CNF) IsSatisfied() bool {
+	return dpll(cnf)
 }
 
 func main() {
@@ -264,8 +254,11 @@ func main() {
 		if err := cnf.Parse(os.Stdin); err != nil {
 			log.Fatal("Parse Error")
 		}
-
-		cnf.IsSatisfied()
+		if cnf.IsSatisfied() {
+			fmt.Println("sat")
+		} else {
+			fmt.Println("unsat")
+		}
 	} else {
 		for i := 1; i < len(os.Args); i++ {
 			f, err := os.Open(os.Args[i])
@@ -279,7 +272,11 @@ func main() {
 				log.Fatal("Parse Error")
 			}
 
-			cnf.IsSatisfied()
+			if cnf.IsSatisfied() {
+				fmt.Println("sat")
+			} else {
+				fmt.Println("unsat")
+			}
 		}
 	}
 }
