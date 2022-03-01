@@ -142,37 +142,42 @@ type purity struct {
 	negative bool
 }
 
-func upsertPurityMap(m map[int]purity, c *clause) map[int]purity {
-	for _, v := range c.Literals {
-		newPurity := purity{}
-		if old, ok := m[absInt(v)]; ok {
-			newPurity = old
+func (cnf *CNF) getPureClauseIndex() []int {
+	m := make(map[int]purity)
+
+	for p := cnf.Head; p != nil; p = p.next {
+		for _, v := range p.Literals {
+			newPurity := purity{}
+			if old, ok := m[absInt(v)]; ok {
+				newPurity = old
+			}
+			if v > 0 {
+				newPurity.positive = true
+			} else {
+				newPurity.negative = true
+			}
+			m[absInt(v)] = newPurity
 		}
-		if v > 0 {
-			newPurity.positive = true
-		} else {
-			newPurity.negative = true
-		}
-		m[absInt(v)] = newPurity
 	}
-	return m
+
+	res := []int{}
+	for k, v := range m {
+		if v.positive != v.negative {
+			if v.positive {
+				res = append(res, k)
+			} else {
+				res = append(res, -k)
+			}
+		}
+	}
+	return res
 }
 
 func simplifyByPureRule(cnf *CNF) {
-	literalPurityMap := make(map[int]purity)
+	literals := cnf.getPureClauseIndex()
 
-	for p := cnf.Head; p != nil; p = p.next {
-		literalPurityMap = upsertPurityMap(literalPurityMap, p)
-	}
-
-	for k, v := range literalPurityMap {
-		if v.positive != v.negative {
-			if v.positive {
-				cnf.deleteClause(k)
-			} else {
-				cnf.deleteClause(-k)
-			}
-		}
+	for _, v := range literals {
+		cnf.deleteClause(v)
 	}
 }
 
