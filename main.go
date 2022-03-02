@@ -138,8 +138,8 @@ func simplifyByUnitRule(cnf *CNF) {
 節集合の中に否定と肯定の両方が現れないリテラル（純リテラル） L があれば、L を含む節を除去する。
 */
 type purity struct {
-	positive bool
-	negative bool
+	positive int
+	negative int
 }
 
 func (cnf *CNF) getPureClauseIndex() []int {
@@ -152,9 +152,9 @@ func (cnf *CNF) getPureClauseIndex() []int {
 				newPurity = old
 			}
 			if v > 0 {
-				newPurity.positive = true
+				newPurity.positive++
 			} else {
-				newPurity.negative = true
+				newPurity.negative++
 			}
 			m[absInt(v)] = newPurity
 		}
@@ -162,12 +162,10 @@ func (cnf *CNF) getPureClauseIndex() []int {
 
 	res := []int{}
 	for k, v := range m {
-		if v.positive != v.negative {
-			if v.positive {
-				res = append(res, k)
-			} else {
-				res = append(res, -k)
-			}
+		if v.positive == 0 && v.negative > 0 {
+			res = append(res, k)
+		} else if v.positive > 0 && v.negative == 0 {
+			res = append(res, -k)
 		}
 	}
 	return res
