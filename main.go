@@ -147,7 +147,7 @@ type purity struct {
 	negative int
 }
 
-func (cnf *CNF) getPureClauseIndex() []int {
+func (cnf *CNF) getLiteralMap() map[int]purity {
 	m := make(map[int]purity)
 
 	for p := cnf.head; p != nil; p = p.next {
@@ -164,6 +164,10 @@ func (cnf *CNF) getPureClauseIndex() []int {
 			m[absInt(v)] = newPurity
 		}
 	}
+	return m
+}
+
+func (cnf *CNF) getPureClauseIndex(m map[int]purity) []int {
 
 	res := []int{}
 	for k, v := range m {
@@ -177,7 +181,8 @@ func (cnf *CNF) getPureClauseIndex() []int {
 }
 
 func simplifyByPureRule(cnf *CNF) {
-	literals := cnf.getPureClauseIndex()
+	literalMap := cnf.getLiteralMap()
+	literals := cnf.getPureClauseIndex(literalMap)
 
 	for _, v := range literals {
 		cnf.deleteClause(v)
@@ -190,21 +195,14 @@ func absInt(v int) int {
 
 // moms heuristicへの準備
 func getAtomicFormula(cnf *CNF) int {
-	variables := map[int]int{}
-	for p := cnf.head; p != nil; p = p.next {
-		for _, literal := range p.Literals {
-			if v, ok := variables[absInt(literal)]; !ok {
-				v++
-				variables[absInt(literal)] = v
-			}
-		}
-	}
+	literalsMap := cnf.getLiteralMap()
+
 	maxNumber := 0
 	maxInt := -1
-	for i, v := range variables {
-		if v > maxNumber {
-			maxNumber = v
-			maxInt = i
+	for k, v := range literalsMap {
+		if v.positive > maxNumber || v.negative > maxNumber {
+			maxNumber = int(math.Max(float64(v.positive), float64(v.negative)))
+			maxInt = k
 		}
 	}
 	return maxInt
