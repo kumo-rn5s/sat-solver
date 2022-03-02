@@ -193,6 +193,11 @@ func absInt(v int) int {
 	return int(math.Abs(float64(v)))
 }
 
+func maxInteger(v1 int, v2 int) int {
+	a := int(math.Max(float64(v1), float64(v2)))
+	return a
+}
+
 // moms heuristicへの準備
 func getAtomicFormula(cnf *CNF) int {
 	literalsMap := cnf.getLiteralMap()
@@ -201,7 +206,7 @@ func getAtomicFormula(cnf *CNF) int {
 	maxInt := -1
 	for k, v := range literalsMap {
 		if v.positive > maxNumber || v.negative > maxNumber {
-			maxNumber = int(math.Max(float64(v.positive), float64(v.negative)))
+			maxNumber = maxInteger(v.positive, v.negative)
 			maxInt = k
 		}
 	}
