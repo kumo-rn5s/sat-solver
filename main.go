@@ -17,12 +17,15 @@ type CNF struct {
 }
 
 type clause struct {
-	Literals []int
+	literals []int
 	next     *clause
 	prev     *clause
 }
 
-const ClauseEND = "0"
+const clauseEND = '0'
+const comment = 'c'
+const preamble = 'p'
+const breakPoint = '%'
 
 func (cnf *CNF) push(c *clause) {
 	if cnf.head == nil && cnf.tail == nil {
@@ -50,31 +53,31 @@ func (cnf *CNF) delete(c *clause) {
 }
 
 func (c *clause) findIndex(literal int) (int, bool) {
-	for index, l := range c.Literals {
+	for index, l := range c.literals {
 		if l == literal {
 			return index, true
 		}
 	}
-	return -1, false
+	return 0, false
 }
 
 func (c *clause) remove(index int) {
-	c.Literals = append(c.Literals[:index], c.Literals[index+1:]...)
+	c.literals = append(c.literals[:index], c.literals[index+1:]...)
 }
 
 func isSkipped(s string) bool {
-	return len(s) == 0 || s[0] == '0' || s[0] == 'c' || s[0] == 'p' || s[0] == '%'
+	return len(s) == 0 || s[0] == clauseEND || s[0] == comment || s[0] == preamble || s[0] == breakPoint
 }
 
 func (cnf *CNF) createClause(l []int) clause {
-	return clause{Literals: l}
+	return clause{literals: l}
 }
 
-func (cnf *CNF) parseLiteral(s string) ([]int, error) {
+func (cnf *CNF) parseLiterals(s string) ([]int, error) {
 	var literals = make([]int, 0, len(s)-1)
 
 	for _, v := range strings.Fields(s) {
-		if v == ClauseEND {
+		if v == string(clauseEND) {
 			break
 		}
 
@@ -91,14 +94,14 @@ func (cnf *CNF) parseLiteral(s string) ([]int, error) {
 	return literals, nil
 }
 
-func (cnf *CNF) Parse(f *os.File) error {
+func (cnf *CNF) ParseDIMACS(f *os.File) error {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		t := scanner.Text()
 		if isSkipped(t) {
 			continue
 		}
-		if literals, err := cnf.parseLiteral(t); err != nil {
+		if literals, err := cnf.parseLiterals(t); err != nil {
 			return err
 		} else {
 			clause := cnf.createClause(literals)
@@ -108,7 +111,7 @@ func (cnf *CNF) Parse(f *os.File) error {
 	return nil
 }
 
-func (cnf *CNF) deleteClause(target int) {
+func (cnf *CNF) deleteClauseByTargetLiteral(target int) {
 	for p := cnf.head; p != nil; p = p.next {
 		if _, found := p.findIndex(target); found {
 			cnf.delete(p)
@@ -116,7 +119,7 @@ func (cnf *CNF) deleteClause(target int) {
 	}
 }
 
-func (cnf *CNF) deleteLiteral(target int) {
+func (cnf *CNF) deleteLiteralFromAllClause(target int) {
 	for p := cnf.head; p != nil; p = p.next {
 		if index, found := p.findIndex(target); found {
 			p.remove(index)
@@ -130,9 +133,9 @@ func (cnf *CNF) deleteLiteral(target int) {
 */
 func simplifyByUnitRule(cnf *CNF) {
 	for p := cnf.head; p != nil; p = p.next {
-		if len(p.Literals) == 1 {
-			cnf.deleteClause(p.Literals[0])
-			cnf.deleteLiteral(-p.Literals[0])
+		if len(p.literals) == 1 {
+			cnf.deleteClauseByTargetLiteral(p.literals[0])
+			cnf.deleteLiteralFromAllClause(-p.literals[0])
 			p.next = cnf.head
 		}
 	}
@@ -151,7 +154,7 @@ func (cnf *CNF) getLiteralMap() map[int]purity {
 	m := make(map[int]purity)
 
 	for p := cnf.head; p != nil; p = p.next {
-		for _, v := range p.Literals {
+		for _, v := range p.literals {
 			newPurity := purity{}
 			if old, ok := m[absInt(v)]; ok {
 				newPurity = old
@@ -185,7 +188,7 @@ func simplifyByPureRule(cnf *CNF) {
 	literals := cnf.getPureClauseIndex(literalMap)
 
 	for _, v := range literals {
-		cnf.deleteClause(v)
+		cnf.deleteClauseByTargetLiteral(v)
 	}
 }
 
@@ -216,14 +219,14 @@ func getAtomicFormula(cnf *CNF) int {
 func (cnf *CNF) deepCopy() *CNF {
 	newcnf := &CNF{}
 	for p := cnf.head; p != nil; p = p.next {
-		newcnf.push(&clause{Literals: append([]int{}, p.Literals...)})
+		newcnf.push(&clause{literals: append([]int{}, p.literals...)})
 	}
 	return newcnf
 }
 
 func (cnf *CNF) hasEmptyclause() bool {
 	for p := cnf.head; p != nil; p = p.next {
-		if len(p.Literals) == 0 {
+		if len(p.literals) == 0 {
 			return true
 		}
 	}
@@ -245,13 +248,13 @@ func dpll(cnf *CNF) bool {
 	variable := getAtomicFormula(cnf)
 	cnfBranch1 := cnf.deepCopy()
 
-	cnfBranch1.push(&clause{Literals: []int{variable}})
+	cnfBranch1.push(&clause{literals: []int{variable}})
 	if dpll(cnfBranch1) {
 		return true
 	}
 
 	cnfBranch2 := cnf.deepCopy()
-	cnfBranch2.push(&clause{Literals: []int{-variable}})
+	cnfBranch2.push(&clause{literals: []int{-variable}})
 	return dpll(cnfBranch2)
 }
 
@@ -262,7 +265,7 @@ func (cnf *CNF) IsSatisfied() bool {
 func main() {
 	if len(os.Args) == 1 {
 		cnf := &CNF{}
-		if err := cnf.Parse(os.Stdin); err != nil {
+		if err := cnf.ParseDIMACS(os.Stdin); err != nil {
 			log.Fatal("Parse Error")
 		}
 		if cnf.IsSatisfied() {
@@ -279,7 +282,7 @@ func main() {
 			defer f.Close()
 
 			cnf := &CNF{}
-			if err := cnf.Parse(f); err != nil {
+			if err := cnf.ParseDIMACS(f); err != nil {
 				log.Fatal("Parse Error")
 			}
 
