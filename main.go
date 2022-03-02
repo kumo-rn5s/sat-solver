@@ -162,16 +162,16 @@ func (cnf *CNF) getLiteralsMap() map[int]purity {
 
 	for p := cnf.head; p != nil; p = p.next {
 		for _, v := range p.literals {
-			newPurity := purity{}
+			purity := purity{}
 			if old, ok := m[absInt(v)]; ok {
-				newPurity = old
+				purity = old
 			}
 			if v > 0 {
-				newPurity.positive++
+				purity.positive++
 			} else {
-				newPurity.negative++
+				purity.negative++
 			}
-			m[absInt(v)] = newPurity
+			m[absInt(v)] = purity
 		}
 	}
 	return m
@@ -225,8 +225,8 @@ func (cnf *CNF) getAtomicFormula() int {
 	return maxLiteral(cnf.getLiteralsMap())
 }
 
-func (cnf *CNF) deepCopy() *CNF {
-	newcnf := &CNF{}
+func (cnf *CNF) deepCopy() CNF {
+	newcnf := CNF{}
 	for p := cnf.head; p != nil; p = p.next {
 		newcnf.push(&clause{literals: append([]int{}, p.literals...)})
 	}
@@ -258,13 +258,13 @@ func dpll(cnf *CNF) bool {
 	cnfBranch1 := cnf.deepCopy()
 
 	cnfBranch1.push(&clause{literals: []int{variable}})
-	if dpll(cnfBranch1) {
+	if dpll(&cnfBranch1) {
 		return true
 	}
 
 	cnfBranch2 := cnf.deepCopy()
 	cnfBranch2.push(&clause{literals: []int{-variable}})
-	return dpll(cnfBranch2)
+	return dpll(&cnfBranch2)
 }
 
 func (cnf *CNF) IsSatisfied() bool {
