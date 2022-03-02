@@ -12,8 +12,8 @@ import (
 )
 
 type CNF struct {
-	Head *clause
-	Tail *clause
+	head *clause
+	tail *clause
 }
 
 type clause struct {
@@ -25,24 +25,24 @@ type clause struct {
 const ClauseEND = "0"
 
 func (cnf *CNF) push(c *clause) {
-	if cnf.Head == nil && cnf.Tail == nil {
-		cnf.Head = c
+	if cnf.head == nil && cnf.tail == nil {
+		cnf.head = c
 	} else {
-		c.prev = cnf.Tail
+		c.prev = cnf.tail
 		c.prev.next = c
 	}
-	cnf.Tail = c
+	cnf.tail = c
 }
 
 func (cnf *CNF) delete(c *clause) {
-	if c == cnf.Head && c == cnf.Tail {
-		cnf.Head = nil
-		cnf.Tail = nil
-	} else if c == cnf.Head {
-		cnf.Head = c.next
+	if c == cnf.head && c == cnf.tail {
+		cnf.head = nil
+		cnf.tail = nil
+	} else if c == cnf.head {
+		cnf.head = c.next
 		c.next.prev = nil
-	} else if c == cnf.Tail {
-		cnf.Tail = c.prev
+	} else if c == cnf.tail {
+		cnf.tail = c.prev
 		c.prev.next = nil
 	} else {
 		c.prev.next, c.next.prev = c.next, c.prev
@@ -104,7 +104,7 @@ func (cnf *CNF) Parse(f *os.File) error {
 }
 
 func (cnf *CNF) deleteClause(target int) {
-	for p := cnf.Head; p != nil; p = p.next {
+	for p := cnf.head; p != nil; p = p.next {
 		if _, found := p.findIndex(target); found {
 			cnf.delete(p)
 		}
@@ -112,7 +112,7 @@ func (cnf *CNF) deleteClause(target int) {
 }
 
 func (cnf *CNF) deleteLiteral(target int) {
-	for p := cnf.Head; p != nil; p = p.next {
+	for p := cnf.head; p != nil; p = p.next {
 		if index, found := p.findIndex(target); found {
 			p.remove(index)
 		}
@@ -124,11 +124,11 @@ func (cnf *CNF) deleteLiteral(target int) {
 リテラル L 1つだけの節があれば、L を含む節を除去し、他の節の否定リテラル ¬L を消去する。
 */
 func simplifyByUnitRule(cnf *CNF) {
-	for p := cnf.Head; p != nil; p = p.next {
+	for p := cnf.head; p != nil; p = p.next {
 		if len(p.Literals) == 1 {
 			cnf.deleteClause(p.Literals[0])
 			cnf.deleteLiteral(-p.Literals[0])
-			p.next = cnf.Head
+			p.next = cnf.head
 		}
 	}
 }
@@ -145,7 +145,7 @@ type purity struct {
 func (cnf *CNF) getPureClauseIndex() []int {
 	m := make(map[int]purity)
 
-	for p := cnf.Head; p != nil; p = p.next {
+	for p := cnf.head; p != nil; p = p.next {
 		for _, v := range p.Literals {
 			newPurity := purity{}
 			if old, ok := m[absInt(v)]; ok {
@@ -188,7 +188,7 @@ func absInt(v int) int {
 // moms heuristicへの準備
 func getAtomicFormula(cnf *CNF) int {
 	variables := map[int]int{}
-	for p := cnf.Head; p != nil; p = p.next {
+	for p := cnf.head; p != nil; p = p.next {
 		for _, literal := range p.Literals {
 			if v, ok := variables[absInt(literal)]; !ok {
 				v++
@@ -209,14 +209,14 @@ func getAtomicFormula(cnf *CNF) int {
 
 func (cnf *CNF) deepCopy() *CNF {
 	newcnf := &CNF{}
-	for p := cnf.Head; p != nil; p = p.next {
+	for p := cnf.head; p != nil; p = p.next {
 		newcnf.push(&clause{Literals: append([]int{}, p.Literals...)})
 	}
 	return newcnf
 }
 
 func (cnf *CNF) hasEmptyclause() bool {
-	for p := cnf.Head; p != nil; p = p.next {
+	for p := cnf.head; p != nil; p = p.next {
 		if len(p.Literals) == 0 {
 			return true
 		}
@@ -228,7 +228,7 @@ func dpll(cnf *CNF) bool {
 	simplifyByUnitRule(cnf)
 	simplifyByPureRule(cnf)
 
-	if cnf.Head == nil {
+	if cnf.head == nil {
 		return true
 	}
 
