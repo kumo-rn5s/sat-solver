@@ -66,7 +66,7 @@ func isSkipped(s string) bool {
 	return len(s) == 0 || s[0] == '0' || s[0] == 'c' || s[0] == 'p' || s[0] == '%'
 }
 
-func (cnf *CNF) parseClause(s string) error {
+func (cnf *CNF) parseClause(s string) ([]int, error) {
 	var literals = make([]int, 0, len(s)-1)
 
 	for _, v := range strings.Fields(s) {
@@ -76,17 +76,15 @@ func (cnf *CNF) parseClause(s string) error {
 
 		num, err := strconv.Atoi(v)
 		if err != nil {
-			return errors.New("wrong dimacs formats")
+			return nil, errors.New("wrong dimacs formats")
 		}
 		literals = append(literals, num)
 	}
 
 	if literals == nil {
-		return errors.New("wrong dimacs formats")
+		return nil, errors.New("wrong dimacs formats")
 	}
-
-	cnf.push(&clause{Literals: literals})
-	return nil
+	return literals, nil
 }
 
 func (cnf *CNF) Parse(f *os.File) error {
@@ -96,8 +94,10 @@ func (cnf *CNF) Parse(f *os.File) error {
 		if isSkipped(t) {
 			continue
 		}
-		if err := cnf.parseClause(t); err != nil {
+		if literals, err := cnf.parseClause(t); err != nil {
 			return err
+		} else {
+			cnf.push(&clause{Literals: literals})
 		}
 	}
 	return nil
