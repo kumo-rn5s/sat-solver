@@ -66,7 +66,11 @@ func isSkipped(s string) bool {
 	return len(s) == 0 || s[0] == '0' || s[0] == 'c' || s[0] == 'p' || s[0] == '%'
 }
 
-func (cnf *CNF) parseClause(s string) ([]int, error) {
+func (cnf *CNF) createClause(l []int) clause {
+	return clause{Literals: l}
+}
+
+func (cnf *CNF) parseLiteral(s string) ([]int, error) {
 	var literals = make([]int, 0, len(s)-1)
 
 	for _, v := range strings.Fields(s) {
@@ -94,10 +98,11 @@ func (cnf *CNF) Parse(f *os.File) error {
 		if isSkipped(t) {
 			continue
 		}
-		if literals, err := cnf.parseClause(t); err != nil {
+		if literals, err := cnf.parseLiteral(t); err != nil {
 			return err
 		} else {
-			cnf.push(&clause{Literals: literals})
+			clause := cnf.createClause(literals)
+			cnf.push(&clause)
 		}
 	}
 	return nil
