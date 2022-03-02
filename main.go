@@ -66,7 +66,11 @@ func (c *clause) remove(index int) {
 }
 
 func isSkipped(s string) bool {
-	return len(s) == 0 || s[0] == clauseEND || s[0] == comment || s[0] == preamble || s[0] == breakPoint
+	return len(s) == 0 || s[0] == clauseEND || s[0] == comment || s[0] == preamble
+}
+
+func isBreakPoint(s string) bool {
+	return s[0] == breakPoint
 }
 
 func (cnf *CNF) createClause(l []int) clause {
@@ -100,6 +104,9 @@ func (cnf *CNF) ParseDIMACS(f *os.File) error {
 		t := scanner.Text()
 		if isSkipped(t) {
 			continue
+		}
+		if isBreakPoint(t) {
+			break
 		}
 		if literals, err := cnf.parseLiterals(t); err != nil {
 			return err
@@ -150,7 +157,7 @@ type purity struct {
 	negative int
 }
 
-func (cnf *CNF) getLiteralMap() map[int]purity {
+func (cnf *CNF) getLiteralsMap() map[int]purity {
 	m := make(map[int]purity)
 
 	for p := cnf.head; p != nil; p = p.next {
@@ -184,8 +191,8 @@ func (cnf *CNF) getPureClauseIndex(m map[int]purity) []int {
 }
 
 func simplifyByPureRule(cnf *CNF) {
-	literalMap := cnf.getLiteralMap()
-	literals := cnf.getPureClauseIndex(literalMap)
+	literalsMap := cnf.getLiteralsMap()
+	literals := cnf.getPureClauseIndex(literalsMap)
 
 	for _, v := range literals {
 		cnf.deleteClauseByTargetLiteral(v)
@@ -201,10 +208,7 @@ func maxInteger(v1 int, v2 int) int {
 	return a
 }
 
-// moms heuristicへの準備
-func getAtomicFormula(cnf *CNF) int {
-	literalsMap := cnf.getLiteralMap()
-
+func maxLiteral(literalsMap map[int]purity) int {
 	maxNumber := 0
 	maxInt := -1
 	for k, v := range literalsMap {
@@ -214,6 +218,11 @@ func getAtomicFormula(cnf *CNF) int {
 		}
 	}
 	return maxInt
+}
+
+// moms heuristicへの準備
+func (cnf *CNF) getAtomicFormula() int {
+	return maxLiteral(cnf.getLiteralsMap())
 }
 
 func (cnf *CNF) deepCopy() *CNF {
@@ -245,7 +254,7 @@ func dpll(cnf *CNF) bool {
 		return false
 	}
 
-	variable := getAtomicFormula(cnf)
+	variable := cnf.getAtomicFormula()
 	cnfBranch1 := cnf.deepCopy()
 
 	cnfBranch1.push(&clause{literals: []int{variable}})
@@ -277,7 +286,7 @@ func main() {
 		for i := 1; i < len(os.Args); i++ {
 			f, err := os.Open(os.Args[i])
 			if err != nil {
-				log.Fatal("Parse Multi File Error")
+				log.Fatal("Parse Multiple File Error")
 			}
 			defer f.Close()
 
