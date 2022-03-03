@@ -78,7 +78,7 @@ func TestSimplifyByUnitRule(t *testing.T) {
 	c.push(&clause{literals: []int{-1}})
 	c.push(&clause{literals: []int{2, 3}})
 
-	simplifyByOneLiteralRule(c)
+	c.simplifyByOneLiteralRule()
 
 	if !reflect.DeepEqual(c.head.literals, []int{}) ||
 		!reflect.ValueOf(c.head.next).IsNil() {
@@ -94,7 +94,7 @@ func TestSimplifyByPureRule(t *testing.T) {
 	c.push(&clause{literals: []int{3, 4}})
 	c.push(&clause{literals: []int{-3, -4}})
 
-	simplifyByPureLiteralRule(c)
+	c.simplifyByPureLiteralRule()
 
 	if !reflect.DeepEqual(c.head.literals, []int{3, 4}) ||
 		!reflect.DeepEqual(c.head.next.literals, []int{-3, -4}) ||

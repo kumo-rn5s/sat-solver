@@ -66,9 +66,9 @@ func (c *cnf) delete(clause *clause) {
 }
 
 func (c *clause) findIndex(literal int) (int, bool) {
-	for index, l := range c.literals {
+	for i, l := range c.literals {
 		if l == literal {
-			return index, true
+			return i, true
 		}
 	}
 	return 0, false
@@ -91,22 +91,19 @@ func (c *cnf) createClause(l []int) *clause {
 }
 
 func (c *cnf) parseLiterals(s string) ([]int, error) {
-	var literals = make([]int, 0, len(s)-1)
+	raw := strings.Fields(s)
+	literals := make([]int, len(raw)-1)
 
-	for _, v := range strings.Fields(s) {
+	for i, v := range raw {
 		if v == string(clauseEND) {
 			break
 		}
 
-		num, err := strconv.Atoi(v)
+		l, err := strconv.Atoi(v)
 		if err != nil {
 			return nil, errors.New("wrong dimacs formats")
 		}
-		literals = append(literals, num)
-	}
-
-	if literals == nil {
-		return nil, errors.New("wrong dimacs formats")
+		literals[i] = l
 	}
 	return literals, nil
 }
@@ -121,38 +118,38 @@ func (c *cnf) parseDIMACS(f *os.File) error {
 		if isBreakPoint(t) {
 			break
 		}
-		if literals, err := c.parseLiterals(t); err != nil {
+		literals, err := c.parseLiterals(t)
+		if err != nil {
 			return err
-		} else {
-			clause := c.createClause(literals)
-			c.push(clause)
 		}
+		clause := c.createClause(literals)
+		c.push(clause)
 	}
 	return nil
 }
 
-func (c *cnf) deleteClauseByTargetLiteral(target int) {
+func (c *cnf) deleteAllClausesByLiteral(literal int) {
 	for p := c.head; p != nil; p = p.next {
-		if _, found := p.findIndex(target); found {
+		if _, found := p.findIndex(literal); found {
 			c.delete(p)
 		}
 	}
 }
 
-func (c *cnf) deleteLiteralFromAllClause(target int) {
+func (c *cnf) deleteLiteralFromAllClauses(literal int) {
 	for p := c.head; p != nil; p = p.next {
-		if index, found := p.findIndex(target); found {
-			p.removeLiteral(index)
+		if i, found := p.findIndex(literal); found {
+			p.removeLiteral(i)
 		}
 	}
 }
 
 // リテラル L 1つだけの節があれば、L を含む節を除去し、他の節の否定リテラル ¬L を消去する。
-func simplifyByOneLiteralRule(c *cnf) {
+func (c *cnf) simplifyByOneLiteralRule() {
 	for p := c.head; p != nil; p = p.next {
 		if len(p.literals) == 1 {
-			c.deleteClauseByTargetLiteral(p.literals[0])
-			c.deleteLiteralFromAllClause(-p.literals[0])
+			c.deleteAllClausesByLiteral(p.literals[0])
+			c.deleteLiteralFromAllClauses(-p.literals[0])
 			p.next = c.head
 		}
 	}
@@ -177,30 +174,30 @@ func (c *cnf) makeLiteralsMap() map[int]*purity {
 	return m
 }
 
-func (c *cnf) getPureClauseIndex(m map[int]*purity) []int {
-	res := []int{}
+func (c *cnf) getPureLiterals(m map[int]*purity) []int {
+	pureLiterals := []int{}
 	for k, v := range m {
 		if v.positive == 0 && v.negative > 0 {
-			res = append(res, -k)
+			pureLiterals = append(pureLiterals, -k)
 		} else if v.positive > 0 && v.negative == 0 {
-			res = append(res, k)
+			pureLiterals = append(pureLiterals, k)
 		}
 	}
-	return res
+	return pureLiterals
 }
 
 // 節集合の中に否定と肯定の両方が現れないリテラル（純リテラル） L があれば、L を含む節を除去する。
-func simplifyByPureLiteralRule(c *cnf) {
+func (c *cnf) simplifyByPureLiteralRule() {
 	literalsMap := c.makeLiteralsMap()
-	literals := c.getPureClauseIndex(literalsMap)
+	pureLiterals := c.getPureLiterals(literalsMap)
 
-	for _, v := range literals {
-		c.deleteClauseByTargetLiteral(v)
+	for _, l := range pureLiterals {
+		c.deleteAllClausesByLiteral(l)
 	}
 }
 
-func absInt(v int) int {
-	return int(math.Abs(float64(v)))
+func absInt(n int) int {
+	return int(math.Abs(float64(n)))
 }
 
 func maxLiteralCount(literalsMap map[int]*purity) int {
@@ -215,7 +212,6 @@ func maxLiteralCount(literalsMap map[int]*purity) int {
 			maxNumber = v.negative
 			maxInt = k
 		}
-
 	}
 	return maxInt
 }
@@ -244,8 +240,8 @@ func (c *cnf) hasEmptyClause() bool {
 }
 
 func (c *cnf) isSatisfied() bool {
-	simplifyByOneLiteralRule(c)
-	simplifyByPureLiteralRule(c)
+	c.simplifyByOneLiteralRule()
+	c.simplifyByPureLiteralRule()
 
 	if c.head == nil {
 		return true
