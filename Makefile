@@ -1,5 +1,6 @@
 PROGRAM:=sat-solver
 
+.PHONY: build
 build:
 	go build
 

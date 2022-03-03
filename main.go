@@ -34,11 +34,11 @@ const (
 	breakPoint = '%'
 )
 
-type hoge interface {
+type solver interface {
 	isSatisfied() bool
 }
 
-var _ hoge = (*cnf)(nil)
+var _ solver = (*cnf)(nil)
 
 func (c *cnf) push(clause *clause) {
 	if c.head == nil && c.tail == nil {
@@ -277,12 +277,14 @@ func (c *cnf) isSatisfied() bool {
 }
 
 func main() {
+	var solver solver
 	if len(os.Args) == 1 {
 		cnf := &cnf{}
 		if err := cnf.parseDIMACS(os.Stdin); err != nil {
 			log.Fatal("Parse Error")
 		}
-		if cnf.isSatisfied() {
+		solver = cnf
+		if solver.isSatisfied() {
 			fmt.Println("sat")
 		} else {
 			fmt.Println("unsat")
@@ -299,7 +301,9 @@ func main() {
 			if err := cnf.parseDIMACS(f); err != nil {
 				log.Fatal("Parse Error")
 			}
-			if cnf.isSatisfied() {
+
+			solver = cnf
+			if solver.isSatisfied() {
 				fmt.Println("sat")
 			} else {
 				fmt.Println("unsat")
