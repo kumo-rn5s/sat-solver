@@ -23,22 +23,22 @@ type clause struct {
 }
 
 type purity struct {
-	positive int
 	negative int
+	positive int
 }
 
 const (
+	breakPoint = '%'
 	clauseEND  = '0'
 	comment    = 'c'
 	preamble   = 'p'
-	breakPoint = '%'
 )
 
-type solver interface {
+type satSolver interface {
 	isSatisfied() bool
 }
 
-var _ solver = (*cnf)(nil)
+var _ satSolver = (*cnf)(nil)
 
 func (c *cnf) push(clause *clause) {
 	if c.head == nil && c.tail == nil {
@@ -74,7 +74,7 @@ func (c *clause) findIndex(literal int) (int, bool) {
 	return 0, false
 }
 
-func (c *clause) remove(index int) {
+func (c *clause) removeLiteral(index int) {
 	c.literals = append(c.literals[:index], c.literals[index+1:]...)
 }
 
@@ -142,16 +142,13 @@ func (c *cnf) deleteClauseByTargetLiteral(target int) {
 func (c *cnf) deleteLiteralFromAllClause(target int) {
 	for p := c.head; p != nil; p = p.next {
 		if index, found := p.findIndex(target); found {
-			p.remove(index)
+			p.removeLiteral(index)
 		}
 	}
 }
 
-/*
-1リテラル規則（one literal rule, unit rule）
-リテラル L 1つだけの節があれば、L を含む節を除去し、他の節の否定リテラル ¬L を消去する。
-*/
-func simplifyByUnitRule(c *cnf) {
+// リテラル L 1つだけの節があれば、L を含む節を除去し、他の節の否定リテラル ¬L を消去する。
+func simplifyByOneLiteralRule(c *cnf) {
 	for p := c.head; p != nil; p = p.next {
 		if len(p.literals) == 1 {
 			c.deleteClauseByTargetLiteral(p.literals[0])
@@ -161,7 +158,7 @@ func simplifyByUnitRule(c *cnf) {
 	}
 }
 
-func (c *cnf) getLiteralsMap() map[int]*purity {
+func (c *cnf) makeLiteralsMap() map[int]*purity {
 	m := make(map[int]*purity)
 
 	for p := c.head; p != nil; p = p.next {
@@ -192,12 +189,9 @@ func (c *cnf) getPureClauseIndex(m map[int]*purity) []int {
 	return res
 }
 
-/*
-純リテラル規則（pure literal rule, affirmative-nagative rule）
-節集合の中に否定と肯定の両方が現れないリテラル（純リテラル） L があれば、L を含む節を除去する。
-*/
-func simplifyByPureRule(c *cnf) {
-	literalsMap := c.getLiteralsMap()
+// 節集合の中に否定と肯定の両方が現れないリテラル（純リテラル） L があれば、L を含む節を除去する。
+func simplifyByPureLiteralRule(c *cnf) {
+	literalsMap := c.makeLiteralsMap()
 	literals := c.getPureClauseIndex(literalsMap)
 
 	for _, v := range literals {
@@ -209,26 +203,26 @@ func absInt(v int) int {
 	return int(math.Abs(float64(v)))
 }
 
-func maxInteger(v1 int, v2 int) int {
-	a := int(math.Max(float64(v1), float64(v2)))
-	return a
-}
-
-func maxLiteral(literalsMap map[int]*purity) int {
+func maxLiteralCount(literalsMap map[int]*purity) int {
 	maxNumber := 0
 	maxInt := -1
 	for k, v := range literalsMap {
-		if v.positive > maxNumber || v.negative > maxNumber {
-			maxNumber = maxInteger(v.positive, v.negative)
+		if v.positive > maxNumber {
+			maxNumber = v.positive
 			maxInt = k
 		}
+		if v.negative > maxNumber {
+			maxNumber = v.negative
+			maxInt = k
+		}
+
 	}
 	return maxInt
 }
 
 // moms heuristicへの準備
 func (c *cnf) getAtomicFormula() int {
-	return maxLiteral(c.getLiteralsMap())
+	return maxLiteralCount(c.makeLiteralsMap())
 }
 
 func (c *cnf) deepCopy() cnf {
@@ -240,7 +234,7 @@ func (c *cnf) deepCopy() cnf {
 	return new
 }
 
-func (c *cnf) hasEmptyclause() bool {
+func (c *cnf) hasEmptyClause() bool {
 	for p := c.head; p != nil; p = p.next {
 		if len(p.literals) == 0 {
 			return true
@@ -250,14 +244,13 @@ func (c *cnf) hasEmptyclause() bool {
 }
 
 func (c *cnf) isSatisfied() bool {
-	simplifyByUnitRule(c)
-	simplifyByPureRule(c)
+	simplifyByOneLiteralRule(c)
+	simplifyByPureLiteralRule(c)
 
 	if c.head == nil {
 		return true
 	}
-
-	if c.hasEmptyclause() {
+	if c.hasEmptyClause() {
 		return false
 	}
 
@@ -277,14 +270,12 @@ func (c *cnf) isSatisfied() bool {
 }
 
 func main() {
-	var solver solver
 	if len(os.Args) == 1 {
 		cnf := &cnf{}
 		if err := cnf.parseDIMACS(os.Stdin); err != nil {
 			log.Fatal("Parse Error")
 		}
-		solver = cnf
-		if solver.isSatisfied() {
+		if cnf.isSatisfied() {
 			fmt.Println("sat")
 		} else {
 			fmt.Println("unsat")
@@ -302,8 +293,7 @@ func main() {
 				log.Fatal("Parse Error")
 			}
 
-			solver = cnf
-			if solver.isSatisfied() {
+			if cnf.isSatisfied() {
 				fmt.Println("sat")
 			} else {
 				fmt.Println("unsat")

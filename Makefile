@@ -4,10 +4,9 @@ PROGRAM:=sat-solver
 build:
 	go build
 
-
 .PHONY: ut
-ut: build
-	go test -v ./...
+ut:
+	go test
 
 .PHONY: it
 it: build
