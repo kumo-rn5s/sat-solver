@@ -184,9 +184,9 @@ func (c *cnf) getPureClauseIndex(m map[int]*purity) []int {
 	res := []int{}
 	for k, v := range m {
 		if v.positive == 0 && v.negative > 0 {
-			res = append(res, k)
-		} else if v.positive > 0 && v.negative == 0 {
 			res = append(res, -k)
+		} else if v.positive > 0 && v.negative == 0 {
+			res = append(res, k)
 		}
 	}
 	return res
