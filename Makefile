@@ -4,7 +4,12 @@ PROGRAM:=sat-solver
 build:
 	go build
 
-.PHONY: test
-test: build
+
+.PHONY: ut
+ut: build
+	go test -v ./...
+
+.PHONY: it
+it: build
 	time ./$(PROGRAM) test/sat/* | uniq
 	time ./$(PROGRAM) test/unsat/* | uniq
