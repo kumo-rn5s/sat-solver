@@ -1,4 +1,9 @@
+PROGRAM:=sat-solver
+
+build:
+	go build
+
 .PHONY: test
-test:
-	go run main.go test/sat/* | uniq
-	go run main.go test/unsat/* | uniq
+test: build
+	time ./$(PROGRAM) test/sat/* | uniq
+	time ./$(PROGRAM) test/unsat/* | uniq

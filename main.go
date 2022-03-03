@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-type CNF struct {
+type cnf struct {
 	head *clause
 	tail *clause
 }
@@ -22,33 +22,46 @@ type clause struct {
 	prev     *clause
 }
 
-const clauseEND = '0'
-const comment = 'c'
-const preamble = 'p'
-const breakPoint = '%'
-
-func (cnf *CNF) push(c *clause) {
-	if cnf.head == nil && cnf.tail == nil {
-		cnf.head = c
-	} else {
-		c.prev = cnf.tail
-		c.prev.next = c
-	}
-	cnf.tail = c
+type purity struct {
+	positive int
+	negative int
 }
 
-func (cnf *CNF) delete(c *clause) {
-	if c == cnf.head && c == cnf.tail {
-		cnf.head = nil
-		cnf.tail = nil
-	} else if c == cnf.head {
-		cnf.head = c.next
-		c.next.prev = nil
-	} else if c == cnf.tail {
-		cnf.tail = c.prev
-		c.prev.next = nil
+const (
+	clauseEND  = '0'
+	comment    = 'c'
+	preamble   = 'p'
+	breakPoint = '%'
+)
+
+type hoge interface {
+	isSatisfied() bool
+}
+
+var _ hoge = (*cnf)(nil)
+
+func (c *cnf) push(clause *clause) {
+	if c.head == nil && c.tail == nil {
+		c.head = clause
 	} else {
-		c.prev.next, c.next.prev = c.next, c.prev
+		clause.prev = c.tail
+		clause.prev.next = clause
+	}
+	c.tail = clause
+}
+
+func (c *cnf) delete(clause *clause) {
+	if clause == c.head && clause == c.tail {
+		c.head = nil
+		c.tail = nil
+	} else if clause == c.head {
+		c.head = clause.next
+		clause.next.prev = nil
+	} else if clause == c.tail {
+		c.tail = clause.prev
+		clause.prev.next = nil
+	} else {
+		clause.prev.next, clause.next.prev = clause.next, clause.prev
 	}
 }
 
@@ -73,11 +86,11 @@ func isBreakPoint(s string) bool {
 	return s[0] == breakPoint
 }
 
-func (cnf *CNF) createClause(l []int) clause {
-	return clause{literals: l}
+func (c *cnf) createClause(l []int) *clause {
+	return &clause{literals: append([]int{}, l...)}
 }
 
-func (cnf *CNF) parseLiterals(s string) ([]int, error) {
+func (c *cnf) parseLiterals(s string) ([]int, error) {
 	var literals = make([]int, 0, len(s)-1)
 
 	for _, v := range strings.Fields(s) {
@@ -98,7 +111,7 @@ func (cnf *CNF) parseLiterals(s string) ([]int, error) {
 	return literals, nil
 }
 
-func (cnf *CNF) ParseDIMACS(f *os.File) error {
+func (c *cnf) parseDIMACS(f *os.File) error {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		t := scanner.Text()
@@ -108,26 +121,26 @@ func (cnf *CNF) ParseDIMACS(f *os.File) error {
 		if isBreakPoint(t) {
 			break
 		}
-		if literals, err := cnf.parseLiterals(t); err != nil {
+		if literals, err := c.parseLiterals(t); err != nil {
 			return err
 		} else {
-			clause := cnf.createClause(literals)
-			cnf.push(&clause)
+			clause := c.createClause(literals)
+			c.push(clause)
 		}
 	}
 	return nil
 }
 
-func (cnf *CNF) deleteClauseByTargetLiteral(target int) {
-	for p := cnf.head; p != nil; p = p.next {
+func (c *cnf) deleteClauseByTargetLiteral(target int) {
+	for p := c.head; p != nil; p = p.next {
 		if _, found := p.findIndex(target); found {
-			cnf.delete(p)
+			c.delete(p)
 		}
 	}
 }
 
-func (cnf *CNF) deleteLiteralFromAllClause(target int) {
-	for p := cnf.head; p != nil; p = p.next {
+func (c *cnf) deleteLiteralFromAllClause(target int) {
+	for p := c.head; p != nil; p = p.next {
 		if index, found := p.findIndex(target); found {
 			p.remove(index)
 		}
@@ -138,47 +151,36 @@ func (cnf *CNF) deleteLiteralFromAllClause(target int) {
 1リテラル規則（one literal rule, unit rule）
 リテラル L 1つだけの節があれば、L を含む節を除去し、他の節の否定リテラル ¬L を消去する。
 */
-func simplifyByUnitRule(cnf *CNF) {
-	for p := cnf.head; p != nil; p = p.next {
+func simplifyByUnitRule(c *cnf) {
+	for p := c.head; p != nil; p = p.next {
 		if len(p.literals) == 1 {
-			cnf.deleteClauseByTargetLiteral(p.literals[0])
-			cnf.deleteLiteralFromAllClause(-p.literals[0])
-			p.next = cnf.head
+			c.deleteClauseByTargetLiteral(p.literals[0])
+			c.deleteLiteralFromAllClause(-p.literals[0])
+			p.next = c.head
 		}
 	}
 }
 
-/*
-純リテラル規則（pure literal rule, affirmative-nagative rule）
-節集合の中に否定と肯定の両方が現れないリテラル（純リテラル） L があれば、L を含む節を除去する。
-*/
-type purity struct {
-	positive int
-	negative int
-}
+func (c *cnf) getLiteralsMap() map[int]*purity {
+	m := make(map[int]*purity)
 
-func (cnf *CNF) getLiteralsMap() map[int]purity {
-	m := make(map[int]purity)
-
-	for p := cnf.head; p != nil; p = p.next {
-		for _, v := range p.literals {
-			purity := purity{}
-			if old, ok := m[absInt(v)]; ok {
-				purity = old
+	for p := c.head; p != nil; p = p.next {
+		for _, l := range p.literals {
+			k := absInt(l)
+			if _, ok := m[k]; !ok {
+				m[k] = &purity{}
 			}
-			if v > 0 {
-				purity.positive++
+			if l > 0 {
+				m[k].positive++
 			} else {
-				purity.negative++
+				m[k].negative++
 			}
-			m[absInt(v)] = purity
 		}
 	}
 	return m
 }
 
-func (cnf *CNF) getPureClauseIndex(m map[int]purity) []int {
-
+func (c *cnf) getPureClauseIndex(m map[int]*purity) []int {
 	res := []int{}
 	for k, v := range m {
 		if v.positive == 0 && v.negative > 0 {
@@ -190,12 +192,16 @@ func (cnf *CNF) getPureClauseIndex(m map[int]purity) []int {
 	return res
 }
 
-func simplifyByPureRule(cnf *CNF) {
-	literalsMap := cnf.getLiteralsMap()
-	literals := cnf.getPureClauseIndex(literalsMap)
+/*
+純リテラル規則（pure literal rule, affirmative-nagative rule）
+節集合の中に否定と肯定の両方が現れないリテラル（純リテラル） L があれば、L を含む節を除去する。
+*/
+func simplifyByPureRule(c *cnf) {
+	literalsMap := c.getLiteralsMap()
+	literals := c.getPureClauseIndex(literalsMap)
 
 	for _, v := range literals {
-		cnf.deleteClauseByTargetLiteral(v)
+		c.deleteClauseByTargetLiteral(v)
 	}
 }
 
@@ -208,7 +214,7 @@ func maxInteger(v1 int, v2 int) int {
 	return a
 }
 
-func maxLiteral(literalsMap map[int]purity) int {
+func maxLiteral(literalsMap map[int]*purity) int {
 	maxNumber := 0
 	maxInt := -1
 	for k, v := range literalsMap {
@@ -221,20 +227,21 @@ func maxLiteral(literalsMap map[int]purity) int {
 }
 
 // moms heuristicへの準備
-func (cnf *CNF) getAtomicFormula() int {
-	return maxLiteral(cnf.getLiteralsMap())
+func (c *cnf) getAtomicFormula() int {
+	return maxLiteral(c.getLiteralsMap())
 }
 
-func (cnf *CNF) deepCopy() CNF {
-	newcnf := CNF{}
-	for p := cnf.head; p != nil; p = p.next {
-		newcnf.push(&clause{literals: append([]int{}, p.literals...)})
+func (c *cnf) deepCopy() cnf {
+	var new cnf
+	for p := c.head; p != nil; p = p.next {
+		clause := c.createClause(p.literals)
+		new.push(clause)
 	}
-	return newcnf
+	return new
 }
 
-func (cnf *CNF) hasEmptyclause() bool {
-	for p := cnf.head; p != nil; p = p.next {
+func (c *cnf) hasEmptyclause() bool {
+	for p := c.head; p != nil; p = p.next {
 		if len(p.literals) == 0 {
 			return true
 		}
@@ -242,42 +249,40 @@ func (cnf *CNF) hasEmptyclause() bool {
 	return false
 }
 
-func dpll(cnf *CNF) bool {
-	simplifyByUnitRule(cnf)
-	simplifyByPureRule(cnf)
+func (c *cnf) isSatisfied() bool {
+	simplifyByUnitRule(c)
+	simplifyByPureRule(c)
 
-	if cnf.head == nil {
+	if c.head == nil {
 		return true
 	}
 
-	if cnf.hasEmptyclause() {
+	if c.hasEmptyclause() {
 		return false
 	}
 
-	variable := cnf.getAtomicFormula()
-	cnfBranch1 := cnf.deepCopy()
+	v := c.getAtomicFormula()
 
-	cnfBranch1.push(&clause{literals: []int{variable}})
-	if dpll(&cnfBranch1) {
+	c2 := c.deepCopy()
+	clause := c2.createClause([]int{v})
+	c2.push(clause)
+	if c2.isSatisfied() {
 		return true
 	}
 
-	cnfBranch2 := cnf.deepCopy()
-	cnfBranch2.push(&clause{literals: []int{-variable}})
-	return dpll(&cnfBranch2)
-}
-
-func (cnf *CNF) IsSatisfied() bool {
-	return dpll(cnf)
+	c3 := c.deepCopy()
+	clause = c3.createClause([]int{-v})
+	c3.push(clause)
+	return c3.isSatisfied()
 }
 
 func main() {
 	if len(os.Args) == 1 {
-		cnf := &CNF{}
-		if err := cnf.ParseDIMACS(os.Stdin); err != nil {
+		cnf := &cnf{}
+		if err := cnf.parseDIMACS(os.Stdin); err != nil {
 			log.Fatal("Parse Error")
 		}
-		if cnf.IsSatisfied() {
+		if cnf.isSatisfied() {
 			fmt.Println("sat")
 		} else {
 			fmt.Println("unsat")
@@ -290,12 +295,11 @@ func main() {
 			}
 			defer f.Close()
 
-			cnf := &CNF{}
-			if err := cnf.ParseDIMACS(f); err != nil {
+			cnf := &cnf{}
+			if err := cnf.parseDIMACS(f); err != nil {
 				log.Fatal("Parse Error")
 			}
-
-			if cnf.IsSatisfied() {
+			if cnf.isSatisfied() {
 				fmt.Println("sat")
 			} else {
 				fmt.Println("unsat")
