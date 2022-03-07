@@ -34,11 +34,20 @@ const (
 	preamble   = 'p'
 )
 
+const (
+	minInt = math.MinInt
+	maxInt = math.MaxInt
+)
+
 type satSolver interface {
 	isSatisfied() bool
 }
 
 var _ satSolver = (*cnf)(nil)
+
+func newCNF() *cnf {
+	return &cnf{}
+}
 
 func (c *cnf) push(clause *clause) {
 	if c.head == nil && c.tail == nil {
@@ -200,29 +209,47 @@ func absInt(n int) int {
 	return int(math.Abs(float64(n)))
 }
 
-func maxLiteralCount(literalsMap map[int]*purity) int {
-	maxNumber := 0
-	maxInt := -1
-	for k, v := range literalsMap {
-		if v.positive > maxNumber {
-			maxNumber = v.positive
-			maxInt = k
+func findMaxLiteral(m map[int]*purity) int {
+	maxCount := minInt
+	maxLiteral := -1
+	for k, v := range m {
+		if v.positive >= maxCount {
+			maxCount = v.positive
+			maxLiteral = k
 		}
-		if v.negative > maxNumber {
-			maxNumber = v.negative
-			maxInt = k
+		if v.negative >= maxCount {
+			maxCount = v.negative
+			maxLiteral = -k
 		}
 	}
-	return maxInt
+	return maxLiteral
 }
 
-// moms heuristicへの準備
+func (c *cnf) getMinClauses() *cnf {
+	minCount := maxInt
+	for p := c.head; p != nil; p = p.next {
+		length := len(p.literals)
+		if length <= minCount {
+			minCount = length
+		}
+	}
+
+	nc := newCNF()
+	for p := c.head; p != nil; p = p.next {
+		if len(p.literals) == minCount {
+			nc.push(p)
+		}
+	}
+	return nc
+}
+
 func (c *cnf) getAtomicFormula() int {
-	return maxLiteralCount(c.makeLiteralsMap())
+	nc := c.getMinClauses()
+	return findMaxLiteral(nc.makeLiteralsMap())
 }
 
-func (c *cnf) deepCopy() cnf {
-	var new cnf
+func (c *cnf) deepCopy() *cnf {
+	new := newCNF()
 	for p := c.head; p != nil; p = p.next {
 		clause := c.createClause(p.literals)
 		new.push(clause)
@@ -267,7 +294,7 @@ func (c *cnf) isSatisfied() bool {
 
 func main() {
 	if len(os.Args) == 1 {
-		cnf := &cnf{}
+		cnf := newCNF()
 		if err := cnf.parseDIMACS(os.Stdin); err != nil {
 			log.Fatal("Parse Error")
 		}
@@ -284,7 +311,7 @@ func main() {
 			}
 			defer f.Close()
 
-			cnf := &cnf{}
+			cnf := newCNF()
 			if err := cnf.parseDIMACS(f); err != nil {
 				log.Fatal("Parse Error")
 			}
