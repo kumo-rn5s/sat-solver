@@ -11,261 +11,294 @@ import (
 	"strings"
 )
 
-type CNF struct {
+type cnf struct {
 	head *clause
 	tail *clause
 }
 
 type clause struct {
-	Literals []int
+	literals []int
 	next     *clause
 	prev     *clause
 }
 
-const ClauseEND = "0"
-
-func (cnf *CNF) push(c *clause) {
-	if cnf.head == nil && cnf.tail == nil {
-		cnf.head = c
-	} else {
-		c.prev = cnf.tail
-		c.prev.next = c
-	}
-	cnf.tail = c
+type purity struct {
+	negative int
+	positive int
 }
 
-func (cnf *CNF) delete(c *clause) {
-	if c == cnf.head && c == cnf.tail {
-		cnf.head = nil
-		cnf.tail = nil
-	} else if c == cnf.head {
-		cnf.head = c.next
-		c.next.prev = nil
-	} else if c == cnf.tail {
-		cnf.tail = c.prev
-		c.prev.next = nil
+const (
+	breakPoint = '%'
+	clauseEND  = '0'
+	comment    = 'c'
+	preamble   = 'p'
+)
+
+const (
+	minInt = math.MinInt
+	maxInt = math.MaxInt
+)
+
+type satSolver interface {
+	isSatisfied() bool
+}
+
+var _ satSolver = (*cnf)(nil)
+
+func newCNF() *cnf {
+	return &cnf{}
+}
+
+func (c *cnf) push(clause *clause) {
+	if c.head == nil && c.tail == nil {
+		c.head = clause
 	} else {
-		c.prev.next, c.next.prev = c.next, c.prev
+		clause.prev = c.tail
+		clause.prev.next = clause
+	}
+	c.tail = clause
+}
+
+func (c *cnf) delete(clause *clause) {
+	if clause == c.head && clause == c.tail {
+		c.head = nil
+		c.tail = nil
+	} else if clause == c.head {
+		c.head = clause.next
+		clause.next.prev = nil
+	} else if clause == c.tail {
+		c.tail = clause.prev
+		clause.prev.next = nil
+	} else {
+		clause.prev.next, clause.next.prev = clause.next, clause.prev
 	}
 }
 
 func (c *clause) findIndex(literal int) (int, bool) {
-	for index, l := range c.Literals {
+	for i, l := range c.literals {
 		if l == literal {
-			return index, true
+			return i, true
 		}
 	}
-	return -1, false
+	return 0, false
 }
 
-func (c *clause) remove(index int) {
-	c.Literals = append(c.Literals[:index], c.Literals[index+1:]...)
+func (c *clause) removeLiteral(index int) {
+	c.literals = append(c.literals[:index], c.literals[index+1:]...)
 }
 
 func isSkipped(s string) bool {
-	return len(s) == 0 || s[0] == '0' || s[0] == 'c' || s[0] == 'p' || s[0] == '%'
+	return len(s) == 0 || s[0] == clauseEND || s[0] == comment || s[0] == preamble
 }
 
-func (cnf *CNF) createClause(l []int) clause {
-	return clause{Literals: l}
+func isBreakPoint(s string) bool {
+	return s[0] == breakPoint
 }
 
-func (cnf *CNF) parseLiteral(s string) ([]int, error) {
-	var literals = make([]int, 0, len(s)-1)
+func createClause(l []int) *clause {
+	return &clause{literals: append([]int{}, l...)}
+}
 
-	for _, v := range strings.Fields(s) {
-		if v == ClauseEND {
+func (c *cnf) parseLiterals(s string) ([]int, error) {
+	raw := strings.Fields(s)
+	literals := make([]int, len(raw)-1)
+
+	for i, v := range raw {
+		if v == string(clauseEND) {
 			break
 		}
 
-		num, err := strconv.Atoi(v)
+		l, err := strconv.Atoi(v)
 		if err != nil {
 			return nil, errors.New("wrong dimacs formats")
 		}
-		literals = append(literals, num)
-	}
-
-	if literals == nil {
-		return nil, errors.New("wrong dimacs formats")
+		literals[i] = l
 	}
 	return literals, nil
 }
 
-func (cnf *CNF) Parse(f *os.File) error {
+func (c *cnf) parseDIMACS(f *os.File) error {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		t := scanner.Text()
 		if isSkipped(t) {
 			continue
 		}
-		if literals, err := cnf.parseLiteral(t); err != nil {
-			return err
-		} else {
-			clause := cnf.createClause(literals)
-			cnf.push(&clause)
+		if isBreakPoint(t) {
+			break
 		}
+		literals, err := c.parseLiterals(t)
+		if err != nil {
+			return err
+		}
+		clause := createClause(literals)
+		c.push(clause)
 	}
 	return nil
 }
 
-func (cnf *CNF) deleteClause(target int) {
-	for p := cnf.head; p != nil; p = p.next {
-		if _, found := p.findIndex(target); found {
-			cnf.delete(p)
+func (c *cnf) deleteAllClausesByLiteral(literal int) {
+	for p := c.head; p != nil; p = p.next {
+		if _, found := p.findIndex(literal); found {
+			c.delete(p)
 		}
 	}
 }
 
-func (cnf *CNF) deleteLiteral(target int) {
-	for p := cnf.head; p != nil; p = p.next {
-		if index, found := p.findIndex(target); found {
-			p.remove(index)
+func (c *cnf) deleteLiteralFromAllClauses(literal int) {
+	for p := c.head; p != nil; p = p.next {
+		if i, found := p.findIndex(literal); found {
+			p.removeLiteral(i)
 		}
 	}
 }
 
-/*
-1リテラル規則（one literal rule, unit rule）
-リテラル L 1つだけの節があれば、L を含む節を除去し、他の節の否定リテラル ¬L を消去する。
-*/
-func simplifyByUnitRule(cnf *CNF) {
-	for p := cnf.head; p != nil; p = p.next {
-		if len(p.Literals) == 1 {
-			cnf.deleteClause(p.Literals[0])
-			cnf.deleteLiteral(-p.Literals[0])
-			p.next = cnf.head
+// リテラル L 1つだけの節があれば、L を含む節を除去し、他の節の否定リテラル ¬L を消去する。
+func (c *cnf) simplifyByOneLiteralRule() {
+	for p := c.head; p != nil; p = p.next {
+		if len(p.literals) == 1 {
+			c.deleteAllClausesByLiteral(p.literals[0])
+			c.deleteLiteralFromAllClauses(-p.literals[0])
+			p.next = c.head
 		}
 	}
 }
 
-/*
-純リテラル規則（pure literal rule, affirmative-nagative rule）
-節集合の中に否定と肯定の両方が現れないリテラル（純リテラル） L があれば、L を含む節を除去する。
-*/
-type purity struct {
-	positive int
-	negative int
-}
+func (c *cnf) makeLiteralsMap() map[int]*purity {
+	m := make(map[int]*purity)
 
-func (cnf *CNF) getLiteralMap() map[int]purity {
-	m := make(map[int]purity)
-
-	for p := cnf.head; p != nil; p = p.next {
-		for _, v := range p.Literals {
-			newPurity := purity{}
-			if old, ok := m[absInt(v)]; ok {
-				newPurity = old
+	for p := c.head; p != nil; p = p.next {
+		for _, l := range p.literals {
+			k := absInt(l)
+			if _, ok := m[k]; !ok {
+				m[k] = &purity{}
 			}
-			if v > 0 {
-				newPurity.positive++
+			if l > 0 {
+				m[k].positive++
 			} else {
-				newPurity.negative++
+				m[k].negative++
 			}
-			m[absInt(v)] = newPurity
 		}
 	}
 	return m
 }
 
-func (cnf *CNF) getPureClauseIndex(m map[int]purity) []int {
-
-	res := []int{}
+func (c *cnf) getPureLiterals(m map[int]*purity) []int {
+	pureLiterals := []int{}
 	for k, v := range m {
 		if v.positive == 0 && v.negative > 0 {
-			res = append(res, k)
+			pureLiterals = append(pureLiterals, -k)
 		} else if v.positive > 0 && v.negative == 0 {
-			res = append(res, -k)
+			pureLiterals = append(pureLiterals, k)
 		}
 	}
-	return res
+	return pureLiterals
 }
 
-func simplifyByPureRule(cnf *CNF) {
-	literalMap := cnf.getLiteralMap()
-	literals := cnf.getPureClauseIndex(literalMap)
+// 節集合の中に否定と肯定の両方が現れないリテラル（純リテラル） L があれば、L を含む節を除去する。
+func (c *cnf) simplifyByPureLiteralRule() {
+	literalsMap := c.makeLiteralsMap()
+	pureLiterals := c.getPureLiterals(literalsMap)
 
-	for _, v := range literals {
-		cnf.deleteClause(v)
+	for _, l := range pureLiterals {
+		c.deleteAllClausesByLiteral(l)
 	}
 }
 
-func absInt(v int) int {
-	return int(math.Abs(float64(v)))
+func absInt(n int) int {
+	return int(math.Abs(float64(n)))
 }
 
-func maxInteger(v1 int, v2 int) int {
-	a := int(math.Max(float64(v1), float64(v2)))
-	return a
-}
-
-// moms heuristicへの準備
-func getAtomicFormula(cnf *CNF) int {
-	literalsMap := cnf.getLiteralMap()
-
-	maxNumber := 0
-	maxInt := -1
-	for k, v := range literalsMap {
-		if v.positive > maxNumber || v.negative > maxNumber {
-			maxNumber = maxInteger(v.positive, v.negative)
-			maxInt = k
+func findMaxLiteral(m map[int]*purity) int {
+	maxCount := minInt
+	maxLiteral := -1
+	for k, v := range m {
+		if v.positive >= maxCount {
+			maxCount = v.positive
+			maxLiteral = k
+		}
+		if v.negative >= maxCount {
+			maxCount = v.negative
+			maxLiteral = -k
 		}
 	}
-	return maxInt
+	return maxLiteral
 }
 
-func (cnf *CNF) deepCopy() *CNF {
-	newcnf := &CNF{}
-	for p := cnf.head; p != nil; p = p.next {
-		newcnf.push(&clause{Literals: append([]int{}, p.Literals...)})
+func (c *cnf) getMinClauses() *cnf {
+	minCount := maxInt
+	for p := c.head; p != nil; p = p.next {
+		length := len(p.literals)
+		if length <= minCount {
+			minCount = length
+		}
 	}
-	return newcnf
+
+	nc := newCNF()
+	for p := c.head; p != nil; p = p.next {
+		if len(p.literals) == minCount {
+			nc.push(createClause(p.literals))
+		}
+	}
+	return nc
 }
 
-func (cnf *CNF) hasEmptyclause() bool {
-	for p := cnf.head; p != nil; p = p.next {
-		if len(p.Literals) == 0 {
+func (c *cnf) getAtomicFormula() int {
+	nc := c.getMinClauses()
+	return findMaxLiteral(nc.makeLiteralsMap())
+}
+
+func (c *cnf) deepCopy() *cnf {
+	new := newCNF()
+	for p := c.head; p != nil; p = p.next {
+		clause := createClause(p.literals)
+		new.push(clause)
+	}
+	return new
+}
+
+func (c *cnf) hasEmptyClause() bool {
+	for p := c.head; p != nil; p = p.next {
+		if len(p.literals) == 0 {
 			return true
 		}
 	}
 	return false
 }
 
-func dpll(cnf *CNF) bool {
-	simplifyByUnitRule(cnf)
-	simplifyByPureRule(cnf)
+func (c *cnf) isSatisfied() bool {
+	c.simplifyByOneLiteralRule()
+	c.simplifyByPureLiteralRule()
 
-	if cnf.head == nil {
+	if c.head == nil {
 		return true
 	}
-
-	if cnf.hasEmptyclause() {
+	if c.hasEmptyClause() {
 		return false
 	}
 
-	variable := getAtomicFormula(cnf)
-	cnfBranch1 := cnf.deepCopy()
+	v := c.getAtomicFormula()
 
-	cnfBranch1.push(&clause{Literals: []int{variable}})
-	if dpll(cnfBranch1) {
+	c2 := c.deepCopy()
+	clause := createClause([]int{v})
+	c2.push(clause)
+	if c2.isSatisfied() {
 		return true
 	}
 
-	cnfBranch2 := cnf.deepCopy()
-	cnfBranch2.push(&clause{Literals: []int{-variable}})
-	return dpll(cnfBranch2)
-}
-
-func (cnf *CNF) IsSatisfied() bool {
-	return dpll(cnf)
+	c3 := c.deepCopy()
+	clause = createClause([]int{-v})
+	c3.push(clause)
+	return c3.isSatisfied()
 }
 
 func main() {
 	if len(os.Args) == 1 {
-		cnf := &CNF{}
-		if err := cnf.Parse(os.Stdin); err != nil {
+		cnf := newCNF()
+		if err := cnf.parseDIMACS(os.Stdin); err != nil {
 			log.Fatal("Parse Error")
 		}
-		if cnf.IsSatisfied() {
+		if cnf.isSatisfied() {
 			fmt.Println("sat")
 		} else {
 			fmt.Println("unsat")
@@ -274,16 +307,16 @@ func main() {
 		for i := 1; i < len(os.Args); i++ {
 			f, err := os.Open(os.Args[i])
 			if err != nil {
-				log.Fatal("Parse Multi File Error")
+				log.Fatal("Parse Multiple File Error")
 			}
 			defer f.Close()
 
-			cnf := &CNF{}
-			if err := cnf.Parse(f); err != nil {
+			cnf := newCNF()
+			if err := cnf.parseDIMACS(f); err != nil {
 				log.Fatal("Parse Error")
 			}
 
-			if cnf.IsSatisfied() {
+			if cnf.isSatisfied() {
 				fmt.Println("sat")
 			} else {
 				fmt.Println("unsat")
