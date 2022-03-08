@@ -34,11 +34,6 @@ const (
 	preamble   = 'p'
 )
 
-const (
-	minInt = math.MinInt
-	maxInt = math.MaxInt
-)
-
 type satSolver interface {
 	isSatisfied() bool
 }
@@ -95,8 +90,8 @@ func isBreakPoint(s string) bool {
 	return s[0] == breakPoint
 }
 
-func createClause(l []int) *clause {
-	return &clause{literals: append([]int{}, l...)}
+func createClause(literals []int) *clause {
+	return &clause{literals: append([]int{}, literals...)}
 }
 
 func (c *cnf) parseLiterals(s string) ([]int, error) {
@@ -210,7 +205,7 @@ func absInt(n int) int {
 }
 
 func findMaxLiteral(m map[int]*purity) int {
-	maxCount := minInt
+	maxCount := math.MinInt
 	maxLiteral := -1
 	for k, v := range m {
 		if v.positive >= maxCount {
@@ -226,7 +221,7 @@ func findMaxLiteral(m map[int]*purity) int {
 }
 
 func (c *cnf) getMinClauses() *cnf {
-	minCount := maxInt
+	minCount := math.MaxInt
 	for p := c.head; p != nil; p = p.next {
 		length := len(p.literals)
 		if length <= minCount {
