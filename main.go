@@ -95,7 +95,7 @@ func isBreakPoint(s string) bool {
 	return s[0] == breakPoint
 }
 
-func (c *cnf) createClause(l []int) *clause {
+func createClause(l []int) *clause {
 	return &clause{literals: append([]int{}, l...)}
 }
 
@@ -131,7 +131,7 @@ func (c *cnf) parseDIMACS(f *os.File) error {
 		if err != nil {
 			return err
 		}
-		clause := c.createClause(literals)
+		clause := createClause(literals)
 		c.push(clause)
 	}
 	return nil
@@ -237,7 +237,7 @@ func (c *cnf) getMinClauses() *cnf {
 	nc := newCNF()
 	for p := c.head; p != nil; p = p.next {
 		if len(p.literals) == minCount {
-			nc.push(p)
+			nc.push(createClause(p.literals))
 		}
 	}
 	return nc
@@ -251,7 +251,7 @@ func (c *cnf) getAtomicFormula() int {
 func (c *cnf) deepCopy() *cnf {
 	new := newCNF()
 	for p := c.head; p != nil; p = p.next {
-		clause := c.createClause(p.literals)
+		clause := createClause(p.literals)
 		new.push(clause)
 	}
 	return new
@@ -280,14 +280,14 @@ func (c *cnf) isSatisfied() bool {
 	v := c.getAtomicFormula()
 
 	c2 := c.deepCopy()
-	clause := c2.createClause([]int{v})
+	clause := createClause([]int{v})
 	c2.push(clause)
 	if c2.isSatisfied() {
 		return true
 	}
 
 	c3 := c.deepCopy()
-	clause = c3.createClause([]int{-v})
+	clause = createClause([]int{-v})
 	c3.push(clause)
 	return c3.isSatisfied()
 }
