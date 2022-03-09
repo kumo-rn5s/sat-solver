@@ -25,7 +25,7 @@ func TestDeepCopy(t *testing.T) {
 	}
 }
 
-func TestDelete(t *testing.T) {
+func TestDeleteCommon(t *testing.T) {
 	c := &cnf{}
 	c.push(&clause{literals: []int{1, 2, 3, 0}})
 	c.push(&clause{literals: []int{2, 3, 4, 0}})
@@ -40,7 +40,7 @@ func TestDelete(t *testing.T) {
 	}
 }
 
-func TestDeletehead(t *testing.T) {
+func TestDeleteHead(t *testing.T) {
 	c := &cnf{}
 
 	c.push(&clause{literals: []int{1, 2, 3, 0}})
@@ -102,3 +102,14 @@ func TestSimplifyByPureRule(t *testing.T) {
 		t.Error("Pure Elimination Failure")
 	}
 }
+
+func TestParseLiterals(t *testing.T)       {}
+func TestRemoveLiteral(t *testing.T)       {}
+func TestFindIndex(t *testing.T)           {}
+func TestHasEmptyClause(t *testing.T)      {}
+func TestGetAtomicFormula(t *testing.T)    {}
+func TestGetMinLenClauses(t *testing.T)    {}
+func TestGetClausesMinLen(t *testing.T)    {}
+func TestFindCountMaxLiteral(t *testing.T) {}
+func TestGetPureLiterals(t *testing.T)     {}
+func TestMakeLiteralsMap(t *testing.T)     {}
