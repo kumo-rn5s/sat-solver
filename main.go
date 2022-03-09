@@ -55,17 +55,22 @@ func (c *cnf) push(clause *clause) {
 }
 
 func (c *cnf) delete(clause *clause) {
-	if clause == c.head && clause == c.tail {
-		c.head = nil
-		c.tail = nil
-	} else if clause == c.head {
-		c.head = clause.next
-		clause.next.prev = nil
-	} else if clause == c.tail {
-		c.tail = clause.prev
-		clause.prev.next = nil
+	if clause != c.head && clause != c.tail {
+		clause.prev.next = clause.next
+		clause.next.prev = clause.prev
 	} else {
-		clause.prev.next, clause.next.prev = clause.next, clause.prev
+		if clause == c.head {
+			c.head = clause.next
+			if c.head != nil {
+				c.head.prev = nil
+			}
+		}
+		if clause == c.tail {
+			c.tail = clause.prev
+			if c.tail != nil {
+				c.tail.next = nil
+			}
+		}
 	}
 }
 
