@@ -209,23 +209,23 @@ func absInt(n int) int {
 	return int(math.Abs(float64(n)))
 }
 
-func findMaxLiteral(m map[int]*purity) int {
-	maxCount := math.MinInt
-	maxLiteral := -1
+func findCountMaxLiteral(m map[int]*purity) int {
+	maxCount := 0
+	literal, _ := strconv.Atoi(string(clauseEND))
 	for k, v := range m {
 		if v.positive >= maxCount {
 			maxCount = v.positive
-			maxLiteral = k
+			literal = k
 		}
 		if v.negative >= maxCount {
 			maxCount = v.negative
-			maxLiteral = -k
+			literal = -k //Key of purity map has literals' absolute value
 		}
 	}
-	return maxLiteral
+	return literal
 }
 
-func (c *cnf) getMinClauses() *cnf {
+func (c *cnf) getClausesMinLen() int {
 	minCount := math.MaxInt
 	for p := c.head; p != nil; p = p.next {
 		length := len(p.literals)
@@ -233,7 +233,10 @@ func (c *cnf) getMinClauses() *cnf {
 			minCount = length
 		}
 	}
+	return minCount
+}
 
+func (c *cnf) getMinLenClauses(minCount int) *cnf {
 	nc := newCNF()
 	for p := c.head; p != nil; p = p.next {
 		if len(p.literals) == minCount {
@@ -244,8 +247,8 @@ func (c *cnf) getMinClauses() *cnf {
 }
 
 func (c *cnf) getAtomicFormula() int {
-	nc := c.getMinClauses()
-	return findMaxLiteral(nc.makeLiteralsMap())
+	nc := c.getMinLenClauses(c.getClausesMinLen())
+	return findCountMaxLiteral(nc.makeLiteralsMap())
 }
 
 func (c *cnf) deepCopy() *cnf {
