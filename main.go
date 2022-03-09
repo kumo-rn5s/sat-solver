@@ -99,7 +99,7 @@ func createClause(literals []int) *clause {
 	return &clause{literals: append([]int{}, literals...)}
 }
 
-func (c *cnf) parseLiterals(s string) ([]int, error) {
+func parseLiterals(s string) ([]int, error) {
 	raw := strings.Fields(s)
 	literals := make([]int, len(raw)-1)
 
@@ -127,7 +127,7 @@ func (c *cnf) parseDIMACS(f *os.File) error {
 		if isBreakPoint(t) {
 			break
 		}
-		literals, err := c.parseLiterals(t)
+		literals, err := parseLiterals(t)
 		if err != nil {
 			return err
 		}
