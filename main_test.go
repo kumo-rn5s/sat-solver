@@ -204,7 +204,6 @@ func TestGetPureLiterals(t *testing.T) {
 	if !reflect.DeepEqual(c.getPureLiterals(c.makeLiteralsMap()), []int{1, 2}) {
 		t.Error("Get Pure Literals Failure")
 	}
-
 }
 func TestMakeLiteralsMap(t *testing.T) {
 	c := &cnf{}
