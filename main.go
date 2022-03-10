@@ -23,8 +23,8 @@ type clause struct {
 }
 
 type purity struct {
-	negative int
-	positive int
+	negative uint
+	positive uint
 }
 
 const (
@@ -54,7 +54,7 @@ func (c *cnf) push(clause *clause) {
 	c.tail = clause
 }
 
-func (c *cnf) delete(clause *clause) {
+func (c *cnf) deleteClause(clause *clause) {
 	if clause != c.head && clause != c.tail {
 		clause.prev.next = clause.next
 		clause.next.prev = clause.prev
@@ -109,7 +109,7 @@ func parseLiterals(s string) ([]int, error) {
 		}
 		l, err := strconv.Atoi(v)
 		if err != nil {
-			return nil, errors.New("Wrong dimacs formats")
+			return nil, errors.New("wrong dimacs formats")
 		}
 		literals = append(literals, l)
 	}
@@ -138,7 +138,7 @@ func (c *cnf) parseDIMACS(f *os.File) error {
 func (c *cnf) deleteAllClausesByLiteral(literal int) {
 	for p := c.head; p != nil; p = p.next {
 		if _, found := p.findIndex(literal); found {
-			c.delete(p)
+			c.deleteClause(p)
 		}
 	}
 }
@@ -151,7 +151,7 @@ func (c *cnf) deleteLiteralFromAllClauses(literal int) {
 	}
 }
 
-// リテラル L 1つだけの節があれば、L を含む節を除去し、他の節の否定リテラル ¬L を消去する。
+// リテラルLが1つだけの節があれば、Lを含む節を除去し、他の節の否定リテラル¬Lを消去する。
 func (c *cnf) simplifyByOneLiteralRule() {
 	for p := c.head; p != nil; p = p.next {
 		if len(p.literals) == 1 {
@@ -192,7 +192,7 @@ func (c *cnf) getPureLiterals(m map[int]*purity) []int {
 	return pureLiterals
 }
 
-// 節集合の中に否定と肯定の両方が現れないリテラル（純リテラル） L があれば、L を含む節を除去する。
+// 節集合の中に肯定と否定の両方が現れないリテラル(純リテラル)Lがあれば、Lを含む節を除去する。
 func (c *cnf) simplifyByPureLiteralRule() {
 	literalsMap := c.makeLiteralsMap()
 	pureLiterals := c.getPureLiterals(literalsMap)
@@ -202,11 +202,15 @@ func (c *cnf) simplifyByPureLiteralRule() {
 }
 
 func absInt(n int) int {
-	return int(math.Abs(float64(n)))
+	if n > 0 {
+		return n
+	} else {
+		return -n
+	}
 }
 
 func findCountMaxLiteral(m map[int]*purity) int {
-	maxCount := 0
+	var maxCount uint
 	literal, _ := strconv.Atoi(string(clauseEND))
 	for k, v := range m {
 		if v.positive > maxCount {
@@ -222,20 +226,20 @@ func findCountMaxLiteral(m map[int]*purity) int {
 }
 
 func (c *cnf) getClausesMinLen() int {
-	minCount := math.MaxInt
+	minLen := math.MaxInt
 	for p := c.head; p != nil; p = p.next {
 		len := len(p.literals)
-		if len > 0 && len < minCount {
-			minCount = len
+		if len < minLen {
+			minLen = len
 		}
 	}
-	return minCount
+	return minLen
 }
 
-func (c *cnf) getMinLenClauses(minCount int) *cnf {
+func (c *cnf) getMinLenClauses(minLen int) *cnf {
 	cnf := newCNF()
 	for p := c.head; p != nil; p = p.next {
-		if len(p.literals) == minCount {
+		if len(p.literals) == minLen {
 			cnf.push(newClause(p.literals))
 		}
 	}
@@ -243,7 +247,11 @@ func (c *cnf) getMinLenClauses(minCount int) *cnf {
 }
 
 func (c *cnf) getAtomicFormula() int {
-	cnf := c.getMinLenClauses(c.getClausesMinLen())
+	minLen := c.getClausesMinLen()
+	if minLen == 0 {
+		log.Fatal("Illegal Length")
+	}
+	cnf := c.getMinLenClauses(minLen)
 	return findCountMaxLiteral(cnf.makeLiteralsMap())
 }
 

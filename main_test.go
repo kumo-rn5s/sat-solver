@@ -31,7 +31,7 @@ func TestDeleteCommon(t *testing.T) {
 	c.push(&clause{literals: []int{2, 3, 4, 0}})
 	c.push(&clause{literals: []int{3, 4, 5, 0}})
 
-	c.delete(c.head.next)
+	c.deleteClause(c.head.next)
 
 	if !reflect.DeepEqual(c.head.literals, []int{1, 2, 3, 0}) ||
 		!reflect.DeepEqual(c.head.next.literals, []int{3, 4, 5, 0}) ||
@@ -47,7 +47,7 @@ func TestDeleteHead(t *testing.T) {
 	c.push(&clause{literals: []int{2, 3, 4, 0}})
 	c.push(&clause{literals: []int{3, 4, 5, 0}})
 
-	c.delete(c.head)
+	c.deleteClause(c.head)
 
 	if !reflect.DeepEqual(c.head.literals, []int{2, 3, 4, 0}) ||
 		!reflect.DeepEqual(c.head.next.literals, []int{3, 4, 5, 0}) {
@@ -62,7 +62,7 @@ func TestDeleteTail(t *testing.T) {
 	c.push(&clause{literals: []int{2, 3, 4, 0}})
 	c.push(&clause{literals: []int{3, 4, 5, 0}})
 
-	c.delete(c.tail)
+	c.deleteClause(c.tail)
 
 	if !reflect.DeepEqual(c.head.literals, []int{1, 2, 3, 0}) ||
 		!reflect.DeepEqual(c.head.next.literals, []int{2, 3, 4, 0}) {
