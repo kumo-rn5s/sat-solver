@@ -23,8 +23,8 @@ type clause struct {
 }
 
 type purity struct {
-	negative int
-	positive int
+	negative uint
+	positive uint
 }
 
 const (
@@ -32,11 +32,6 @@ const (
 	clauseEND  = '0'
 	comment    = 'c'
 	preamble   = 'p'
-)
-
-const (
-	minInt = math.MinInt
-	maxInt = math.MaxInt
 )
 
 type satSolver interface {
@@ -59,18 +54,23 @@ func (c *cnf) push(clause *clause) {
 	c.tail = clause
 }
 
-func (c *cnf) delete(clause *clause) {
-	if clause == c.head && clause == c.tail {
-		c.head = nil
-		c.tail = nil
-	} else if clause == c.head {
-		c.head = clause.next
-		clause.next.prev = nil
-	} else if clause == c.tail {
-		c.tail = clause.prev
-		clause.prev.next = nil
+func (c *cnf) deleteClause(clause *clause) {
+	if clause != c.head && clause != c.tail {
+		clause.prev.next = clause.next
+		clause.next.prev = clause.prev
 	} else {
-		clause.prev.next, clause.next.prev = clause.next, clause.prev
+		if clause == c.head {
+			c.head = clause.next
+			if c.head != nil {
+				c.head.prev = nil
+			}
+		}
+		if clause == c.tail {
+			c.tail = clause.prev
+			if c.tail != nil {
+				c.tail.next = nil
+			}
+		}
 	}
 }
 
@@ -95,24 +95,23 @@ func isBreakPoint(s string) bool {
 	return s[0] == breakPoint
 }
 
-func createClause(l []int) *clause {
-	return &clause{literals: append([]int{}, l...)}
+func newClause(literals []int) *clause {
+	return &clause{literals: append([]int{}, literals...)}
 }
 
-func (c *cnf) parseLiterals(s string) ([]int, error) {
+func parseLiterals(s string) ([]int, error) {
 	raw := strings.Fields(s)
-	literals := make([]int, len(raw)-1)
+	literals := make([]int, 0, len(raw)-1)
 
-	for i, v := range raw {
+	for _, v := range raw {
 		if v == string(clauseEND) {
 			break
 		}
-
 		l, err := strconv.Atoi(v)
 		if err != nil {
 			return nil, errors.New("wrong dimacs formats")
 		}
-		literals[i] = l
+		literals = append(literals, l)
 	}
 	return literals, nil
 }
@@ -127,12 +126,11 @@ func (c *cnf) parseDIMACS(f *os.File) error {
 		if isBreakPoint(t) {
 			break
 		}
-		literals, err := c.parseLiterals(t)
+		literals, err := parseLiterals(t)
 		if err != nil {
 			return err
 		}
-		clause := createClause(literals)
-		c.push(clause)
+		c.push(newClause(literals))
 	}
 	return nil
 }
@@ -140,7 +138,7 @@ func (c *cnf) parseDIMACS(f *os.File) error {
 func (c *cnf) deleteAllClausesByLiteral(literal int) {
 	for p := c.head; p != nil; p = p.next {
 		if _, found := p.findIndex(literal); found {
-			c.delete(p)
+			c.deleteClause(p)
 		}
 	}
 }
@@ -153,7 +151,7 @@ func (c *cnf) deleteLiteralFromAllClauses(literal int) {
 	}
 }
 
-// リテラル L 1つだけの節があれば、L を含む節を除去し、他の節の否定リテラル ¬L を消去する。
+// リテラルLが1つだけの節があれば、Lを含む節を除去し、他の節の否定リテラル¬Lを消去する。
 func (c *cnf) simplifyByOneLiteralRule() {
 	for p := c.head; p != nil; p = p.next {
 		if len(p.literals) == 1 {
@@ -166,7 +164,6 @@ func (c *cnf) simplifyByOneLiteralRule() {
 
 func (c *cnf) makeLiteralsMap() map[int]*purity {
 	m := make(map[int]*purity)
-
 	for p := c.head; p != nil; p = p.next {
 		for _, l := range p.literals {
 			k := absInt(l)
@@ -184,77 +181,86 @@ func (c *cnf) makeLiteralsMap() map[int]*purity {
 }
 
 func (c *cnf) getPureLiterals(m map[int]*purity) []int {
-	pureLiterals := []int{}
+	pureLiterals := make([]int, 0, len(m))
 	for k, v := range m {
-		if v.positive == 0 && v.negative > 0 {
-			pureLiterals = append(pureLiterals, -k)
-		} else if v.positive > 0 && v.negative == 0 {
+		if v.positive > 0 && v.negative == 0 {
 			pureLiterals = append(pureLiterals, k)
+		} else if v.positive == 0 && v.negative > 0 {
+			pureLiterals = append(pureLiterals, -k) // Key of purity map has literals' absolute value.
 		}
 	}
 	return pureLiterals
 }
 
-// 節集合の中に否定と肯定の両方が現れないリテラル（純リテラル） L があれば、L を含む節を除去する。
+// 節集合の中に肯定と否定の両方が現れないリテラル(純リテラル)Lがあれば、Lを含む節を除去する。
 func (c *cnf) simplifyByPureLiteralRule() {
 	literalsMap := c.makeLiteralsMap()
 	pureLiterals := c.getPureLiterals(literalsMap)
-
 	for _, l := range pureLiterals {
 		c.deleteAllClausesByLiteral(l)
 	}
 }
 
 func absInt(n int) int {
-	return int(math.Abs(float64(n)))
+	if n > 0 {
+		return n
+	} else {
+		return -n
+	}
 }
 
-func findMaxLiteral(m map[int]*purity) int {
-	maxCount := minInt
-	maxLiteral := -1
+func findCountMaxLiteral(m map[int]*purity) int {
+	var maxCount uint
+	literal, _ := strconv.Atoi(string(clauseEND))
 	for k, v := range m {
-		if v.positive >= maxCount {
+		if v.positive > maxCount {
 			maxCount = v.positive
-			maxLiteral = k
+			literal = k
 		}
-		if v.negative >= maxCount {
+		if v.negative > maxCount {
 			maxCount = v.negative
-			maxLiteral = -k
+			literal = -k // Key of purity map has literals' absolute value.
 		}
 	}
-	return maxLiteral
+	return literal
 }
 
-func (c *cnf) getMinClauses() *cnf {
-	minCount := maxInt
+func (c *cnf) getClausesMinLen() int {
+	minLen := math.MaxInt
 	for p := c.head; p != nil; p = p.next {
-		length := len(p.literals)
-		if length <= minCount {
-			minCount = length
+		len := len(p.literals)
+		if len < minLen {
+			minLen = len
 		}
 	}
+	return minLen
+}
 
-	nc := newCNF()
+func (c *cnf) getMinLenClauses(minLen int) *cnf {
+	cnf := newCNF()
 	for p := c.head; p != nil; p = p.next {
-		if len(p.literals) == minCount {
-			nc.push(createClause(p.literals))
+		if len(p.literals) == minLen {
+			cnf.push(newClause(p.literals))
 		}
 	}
-	return nc
+	return cnf
 }
 
 func (c *cnf) getAtomicFormula() int {
-	nc := c.getMinClauses()
-	return findMaxLiteral(nc.makeLiteralsMap())
+	minLen := c.getClausesMinLen()
+	if minLen == 0 {
+		log.Fatal("Illegal Length")
+	}
+	cnf := c.getMinLenClauses(minLen)
+	return findCountMaxLiteral(cnf.makeLiteralsMap())
 }
 
 func (c *cnf) deepCopy() *cnf {
-	new := newCNF()
+	cnf := newCNF()
 	for p := c.head; p != nil; p = p.next {
-		clause := createClause(p.literals)
-		new.push(clause)
+		cnf.push(newClause(p.literals))
 	}
-	return new
+	return cnf
 }
 
 func (c *cnf) hasEmptyClause() bool {
@@ -280,15 +286,13 @@ func (c *cnf) isSatisfied() bool {
 	v := c.getAtomicFormula()
 
 	c2 := c.deepCopy()
-	clause := createClause([]int{v})
-	c2.push(clause)
+	c2.push(newClause([]int{v}))
 	if c2.isSatisfied() {
 		return true
 	}
 
 	c3 := c.deepCopy()
-	clause = createClause([]int{-v})
-	c3.push(clause)
+	c3.push(newClause([]int{-v}))
 	return c3.isSatisfied()
 }
 
@@ -315,7 +319,6 @@ func main() {
 			if err := cnf.parseDIMACS(f); err != nil {
 				log.Fatal("Parse Error")
 			}
-
 			if cnf.isSatisfied() {
 				fmt.Println("sat")
 			} else {
