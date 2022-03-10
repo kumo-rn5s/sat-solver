@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 )
@@ -131,6 +132,9 @@ func (c *cnf) parseDIMACS(f *os.File) error {
 			return err
 		}
 		c.push(newClause(literals))
+	}
+	if reflect.ValueOf(c.head).IsNil() {
+		return errors.New("empty file")
 	}
 	return nil
 }
