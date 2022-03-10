@@ -12,6 +12,6 @@ unit-test:
 	go test
 
 .PHONY: integration-test
-integration-test: build
+integration-test:
 	time ./$(PROGRAM) test/sat/* | uniq
 	time ./$(PROGRAM) test/unsat/* | uniq
