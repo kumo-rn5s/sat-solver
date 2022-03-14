@@ -1,13 +1,9 @@
-FROM golang:alpine as builder
-RUN mkdir /build
-ADD *.go /build/
-ADD go.* /build/
+FROM golang:1.17.8-alpine3.15 as builder
 WORKDIR /build
-RUN go test && CGO_ENABLED=0 GOOS=linux go build
+COPY . /build/
+RUN GOOS=linux GOARCH=arm64 go build
 
-FROM alpine/make:latest
+FROM alpine:3.15
 COPY --from=builder /build/sat-solver .
-COPY ./test ./test
-COPY Makefile .
 
-ENTRYPOINT [ "sh","-c","make integration-test" ]
+ENTRYPOINT ["/bin/sh","-c","./sat-solver"]
