@@ -12,17 +12,7 @@ jobs:
     steps:
     - name: Clone codes
       uses: actions/checkout@v2
-    - name: Set up Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: 1.17
     - name: Build
-      run: go build
-    - name: Unit Test
-      run: go test
-    - name: Integration test
-      run: |
-        RESULT=$(./sat-solver test/sat/* | uniq && ./sat-solver test/unsat/* | uniq)
-        if (( $(grep -c . <<<"$RESULT") > 2 )); then
-          exit 1
-        fi
+      run: make docker-build
+    - name: Test
+      run: make docker-run-test
