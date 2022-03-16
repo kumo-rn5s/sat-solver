@@ -1,10 +1,5 @@
 FROM golang:1.17.8-alpine3.15 as builder
-WORKDIR /build
-RUN apk add make
+WORKDIR /app
 COPY . .
-RUN make build
-
-FROM alpine:3.15
-COPY --from=builder /build/sat-solver /build/integration-test.sh /build/time-test.sh ./
-
-ENTRYPOINT ["./sat-solver"]
+RUN apk add make && make build
+CMD ["./sat-solver"]

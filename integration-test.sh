@@ -1,11 +1,13 @@
-#!/bin/sh
-set -e
+#!/bin/sh -eu
 
-RESULT_SAT=$(./sat-solver test/sat/* | uniq)
-RESULT_UNSAT=$(./sat-solver test/unsat/* | uniq)
+readonly FILE="integration-test"
+time ./sat-solver test/sat/* | uniq | tee "$FILE"
+time ./sat-solver test/unsat/* | uniq | tee -a "$FILE"
 
-if [ \( "$RESULT_SAT" != "sat" \) ] || [ \( "$RESULT_UNSAT" != "unsat" \) ]; then
-    exit 1
+nlines=$(wc -l "$FILE" | awk '{print $1}')
+if [ "$nlines" = 2 ]; then
+  echo "Integration Test Successfully"
 else
-    echo "Integration Test Successfully"
+  echo "Integration Test Failure"
+  exit 1
 fi

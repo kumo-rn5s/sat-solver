@@ -1,5 +1,5 @@
 IMAGE:=sat-solver
-TAG:=latest
+TAG:=$(shell git rev-parse HEAD)
 
 .PHONY: build
 build:
@@ -13,13 +13,9 @@ docker-build:
 docker-run-test: docker-unit-test docker-integration-test
 
 .PHONY: docker-unit-test
-docker-unit-test:
-	docker run --rm -v $(PWD):/src --workdir=/src golang:1.17.8-alpine3.15 sh -c "go test"
+docker-unit-test: docker-build
+	docker run --rm $(IMAGE):$(TAG) go test
 
 .PHONY: docker-integration-test
-docker-integration-test:
-	docker run --rm --entrypoint="" -v $(PWD)/test:/test $(IMAGE):$(TAG) ./integration-test.sh
-
-.PHONY: docker-timer-test
-docker-timer-test: 
-	docker run --rm --entrypoint="" -v $(PWD)/test:/test $(IMAGE):$(TAG) ./time-test.sh
+docker-integration-test: docker-build
+	docker run --rm $(IMAGE):$(TAG) ./integration-test.sh
