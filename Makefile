@@ -9,6 +9,10 @@ build:
 docker-build:
 	docker build -t $(IMAGE):$(TAG) .
 
+.PHONY: docker-run
+docker-run: docker-build
+	docker run --rm -i $(IMAGE):$(TAG) < $(CNF)
+
 .PHONY: docker-run-test
 docker-run-test: docker-unit-test docker-integration-test
 
