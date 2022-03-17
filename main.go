@@ -7,7 +7,6 @@ import (
 	"log"
 	"math"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 )
@@ -133,7 +132,7 @@ func (c *cnf) parseDIMACS(f *os.File) error {
 		}
 		c.push(newClause(literals))
 	}
-	if reflect.ValueOf(c.head).IsNil() {
+	if c.head == nil {
 		return errors.New("empty file")
 	}
 	return nil
@@ -304,7 +303,7 @@ func main() {
 	if len(os.Args) == 1 {
 		cnf := newCNF()
 		if err := cnf.parseDIMACS(os.Stdin); err != nil {
-			log.Fatal("Parse Error")
+			log.Fatal(err)
 		}
 		if cnf.isSatisfied() {
 			fmt.Println("sat")
@@ -321,7 +320,7 @@ func main() {
 
 			cnf := newCNF()
 			if err := cnf.parseDIMACS(f); err != nil {
-				log.Fatal("Parse Error")
+				log.Fatal(err)
 			}
 			if cnf.isSatisfied() {
 				fmt.Println("sat")

@@ -197,11 +197,11 @@ func TestFindCountMaxLiteral(t *testing.T) {
 func TestGetPureLiterals(t *testing.T) {
 	c := &cnf{}
 	c.push(&clause{literals: []int{1, 2, 3}})
-	c.push(&clause{literals: []int{1, 2}})
+	c.push(&clause{literals: []int{-1, 2}})
 	c.push(&clause{literals: []int{2, -3}})
 	c.push(&clause{literals: []int{2, 3}})
 
-	if !reflect.DeepEqual(c.getPureLiterals(c.makeLiteralsMap()), []int{1, 2}) {
+	if !reflect.DeepEqual(c.getPureLiterals(c.makeLiteralsMap()), []int{2}) {
 		t.Error("Get Pure Literals Failure")
 	}
 }

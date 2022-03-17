@@ -1,17 +1,31 @@
+CNF:=test/sat/uf100-01.cnf
+IMAGE:=sat-solver
 PROGRAM:=sat-solver
+TAG:=$(shell git rev-parse HEAD)
 
 .PHONY: build
 build:
-	go build
+	go build "-ldflags=-s -w -buildid=" -trimpath -o $(PROGRAM)
 
-.PHONY: test
-test: unit-test integration-test
+.PHONY: docker-build
+docker-build:
+	docker build -t $(IMAGE):$(TAG) .
 
-.PHONY: unit-test
-unit-test:
-	go test
+.PHONY: docker-run
+docker-run: docker-build
+	docker run --rm -i $(IMAGE):$(TAG) < $(CNF)
 
-.PHONY: integration-test
-integration-test:
-	time ./$(PROGRAM) test/sat/* | uniq
-	time ./$(PROGRAM) test/unsat/* | uniq
+.PHONY: docker-run-test
+docker-run-test: docker-unit-test docker-integration-test
+
+.PHONY: docker-unit-test
+docker-unit-test: docker-build
+	docker run --rm $(IMAGE):$(TAG) go test
+
+.PHONY: docker-integration-test
+docker-integration-test: docker-build
+	docker run --rm $(IMAGE):$(TAG) ./integration-test.sh
+
+.PHONY: clean
+clean:
+	rm $(PROGRAM)

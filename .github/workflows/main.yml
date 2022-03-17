@@ -1,0 +1,16 @@
+name: sat solver
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: clone codes
+      uses: actions/checkout@v2
+    - name: build
+      run: make docker-build
+    - name: test
+      run: make docker-run-test
