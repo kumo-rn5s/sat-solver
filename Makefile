@@ -1,9 +1,10 @@
+CNF:=test/sat/uf100-01.cnf
 IMAGE:=sat-solver
 TAG:=$(shell git rev-parse HEAD)
 
 .PHONY: build
 build:
-	go build
+	go build "-ldflags=-s -w -buildid=" -trimpath
 
 .PHONY: docker-build
 docker-build:

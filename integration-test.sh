@@ -1,16 +1,18 @@
 #!/bin/sh -eu
 
-readonly FILE="integration-test"
-time ./sat-solver test/sat/* | uniq | tee "$FILE"
-time ./sat-solver test/unsat/* | uniq | tee -a "$FILE"
+test() {
+  if [ "$1" != "$2" ]; then
+    echo "Integration Test Failure"
+    exit 1
+  fi
+}
 
-nlines=$(wc -l "$FILE" | awk '{print $1}')
-satres=$(sed -n '1p' < $FILE)
-unsatres=$(sed -n '2p' < $FILE)
-
-if [ "$nlines" = 2 ] && [ "$satres" = "sat" ] && [ "$unsatres" = "unsat" ]; then
+main() {
+  result=$(./sat-solver test/sat/* | uniq)
+  test sat "$result"
+  result=$(./sat-solver test/unsat/* | uniq)
+  test unsat "$result"
   echo "Integration Test Successfully"
-else
-  echo "Integration Test Failure"
-  exit 1
-fi
+}
+
+main
